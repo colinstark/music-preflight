@@ -616,6 +616,31 @@ func TestIdleAfterCancellation(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// A cancelled run surfaces the engine's partial report instead of a blank
+// summary, and does not present the cancellation as an error.
+// ---------------------------------------------------------------------------
+
+func TestCancelShowsPartialResults(t *testing.T) {
+	report := core.Report{CoversResized: 4, Skipped: 2}
+	fr := newImmediateFakeRunner(nil, report, context.Canceled)
+	ui := prepareUIWithFolder(t, fr.run)
+
+	test.Tap(ui.runBtn)
+	waitForRunDone(t, ui, 3*time.Second)
+
+	summary := ui.summaryLabel.Text
+	if !strings.Contains(strings.ToLower(summary), "cancel") {
+		t.Errorf("cancelled-run summary should note the cancellation, got: %q", summary)
+	}
+	if !strings.Contains(summary, "Covers Resized: 4") {
+		t.Errorf("cancelled-run summary should show partial counters, got: %q", summary)
+	}
+	if ui.errorLabel.Text != "" {
+		t.Errorf("cancellation should not be surfaced as an error, got errorLabel: %q", ui.errorLabel.Text)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // VAL-EXEC-019: Engine-level error is surfaced to the user
 // VAL-EXEC-020: A failing run still returns the UI to idle
 // ---------------------------------------------------------------------------

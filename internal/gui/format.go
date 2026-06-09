@@ -37,11 +37,17 @@ func formatEvent(e core.Event) string {
 	}
 }
 
-// formatReport renders a core.Report as a multi-line summary string
-// showing all seven counters.
-func formatReport(r core.Report) string {
-	return fmt.Sprintf(
+// formatReport renders a core.Report as a multi-line summary string showing
+// all seven counters. When dryRun is true it prefixes a banner clarifying that
+// nothing was written and the counts are intended (not performed) actions —
+// otherwise an enabled-by-default dry-run could read as if files had changed.
+func formatReport(r core.Report, dryRun bool) string {
+	counts := fmt.Sprintf(
 		"Renamed: %d\nCovers Resized: %d\nExtracted: %d\nEmbedded Resized: %d\nTranscoded: %d\nSkipped: %d\nFailed: %d",
 		r.Renamed, r.CoversResized, r.Extracted, r.EmbeddedResized, r.Transcoded, r.Skipped, r.Failed,
 	)
+	if dryRun {
+		return "Dry-run — no files were modified. Counts show what would change:\n\n" + counts
+	}
+	return counts
 }

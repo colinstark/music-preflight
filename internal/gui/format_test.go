@@ -103,7 +103,7 @@ func TestFormatEventDistinctKinds(t *testing.T) {
 
 func TestFormatReportAllCounters(t *testing.T) {
 	r := core.Report{Renamed: 1, CoversResized: 2, Extracted: 3, EmbeddedResized: 4, Transcoded: 5, Skipped: 6, Failed: 7}
-	got := formatReport(r)
+	got := formatReport(r, false)
 	expected := []string{
 		"Renamed: 1",
 		"Covers Resized: 2",
@@ -122,7 +122,7 @@ func TestFormatReportAllCounters(t *testing.T) {
 
 func TestFormatReportZero(t *testing.T) {
 	r := core.Report{}
-	got := formatReport(r)
+	got := formatReport(r, false)
 	expected := []string{
 		"Renamed: 0",
 		"Covers Resized: 0",
@@ -136,5 +136,22 @@ func TestFormatReportZero(t *testing.T) {
 		if !strings.Contains(got, exp) {
 			t.Errorf("zero formatReport missing %q, got: %q", exp, got)
 		}
+	}
+}
+
+func TestFormatReportDryRunBanner(t *testing.T) {
+	r := core.Report{CoversResized: 3}
+
+	dry := formatReport(r, true)
+	if !strings.Contains(strings.ToLower(dry), "dry-run") {
+		t.Errorf("dry-run report should mention dry-run, got: %q", dry)
+	}
+	if !strings.Contains(dry, "Covers Resized: 3") {
+		t.Errorf("dry-run report should still show counters, got: %q", dry)
+	}
+
+	real := formatReport(r, false)
+	if strings.Contains(strings.ToLower(real), "dry-run") {
+		t.Errorf("non-dry-run report should not mention dry-run, got: %q", real)
 	}
 }

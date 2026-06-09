@@ -10,6 +10,8 @@ import (
 // Dir is set from the selected folder; transcode is mapped via
 // core.ParseTranscodeMode; empty or non-numeric art-size and quality
 // entries fall back to the engine defaults (500 and 85 respectively).
+// A quality above 100 is clamped to 100 so it honors the user's intent
+// (max quality) rather than being silently reset to the default by the engine.
 func (ui *UI) options() core.Options {
 	defs := core.DefaultOptions()
 
@@ -20,6 +22,9 @@ func (ui *UI) options() core.Options {
 
 	quality := defs.JPEGQuality // 85
 	if v, err := strconv.Atoi(ui.qualityEntry.Text); err == nil && v > 0 {
+		if v > 100 {
+			v = 100
+		}
 		quality = v
 	}
 

@@ -6,6 +6,10 @@ package gui
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strconv"
+	"strings"
+	"sync"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -47,6 +51,13 @@ type UI struct {
 	cancelFn    context.CancelFunc
 	running     bool
 	runDone     chan struct{} // closed when a run completes (for test sync)
+
+	// Progress log batching. The worker goroutine appends formatted lines to
+	// progressBuf (O(1) amortized); widget updates are coalesced so we issue
+	// at most one pending fyne.Do flush at a time instead of one per event.
+	progressMu      sync.Mutex
+	progressBuf     strings.Builder
+	progressPending bool
 
 	// Error display
 	errorLabel *widget.Label
@@ -95,6 +106,10 @@ func (ui *UI) onRun() {
 	ui.runDone = make(chan struct{})
 
 	// Clear prior output
+	ui.progressMu.Lock()
+	ui.progressBuf.Reset()
+	ui.progressPending = false
+	ui.progressMu.Unlock()
 	ui.progressLog.SetText("")
 	ui.summaryLabel.SetText("")
 	ui.errorLabel.SetText("")
@@ -122,14 +137,19 @@ func (ui *UI) onRun() {
 				close(ui.runDone)
 			}()
 
-			if err != nil {
-				if errors.Is(err, context.Canceled) {
-					// User cancelled — just return to idle
-				} else {
-					ui.errorLabel.SetText(err.Error())
-				}
-			} else {
-				ui.summaryLabel.SetText(formatReport(report))
+			// Final flush so the log reflects every event, regardless of how
+			// the coalesced progress flushes happened to be scheduled.
+			ui.flushProgressLog()
+
+			switch {
+			case err == nil:
+				ui.summaryLabel.SetText(formatReport(report, opts.DryRun))
+			case errors.Is(err, context.Canceled):
+				// Cancelled mid-run: the engine still returns the work done so
+				// far, so surface it rather than leaving the summary blank.
+				ui.summaryLabel.SetText("Run cancelled — partial results:\n\n" + formatReport(report, opts.DryRun))
+			default:
+				ui.errorLabel.SetText(err.Error())
 			}
 		})
 	}()
@@ -144,16 +164,36 @@ func (ui *UI) onCancel() {
 }
 
 // progressCallback is the engine progress callback. It runs on the worker
-// goroutine, so all widget updates are marshaled to the UI thread via fyne.Do.
+// goroutine, so it appends to progressBuf and marshals a coalesced flush to
+// the UI thread via fyne.Do — at most one flush is in flight at a time, so a
+// burst of events costs one widget update rather than one per event.
 func (ui *UI) progressCallback(e core.Event) {
 	line := formatEvent(e)
-	fyne.Do(func() {
-		cur := ui.progressLog.Text
-		if cur != "" {
-			cur += "\n"
-		}
-		ui.progressLog.SetText(cur + line)
-	})
+
+	ui.progressMu.Lock()
+	if ui.progressBuf.Len() > 0 {
+		ui.progressBuf.WriteByte('\n')
+	}
+	ui.progressBuf.WriteString(line)
+	schedule := !ui.progressPending
+	ui.progressPending = true
+	ui.progressMu.Unlock()
+
+	if schedule {
+		fyne.Do(ui.flushProgressLog)
+	}
+}
+
+// flushProgressLog writes the accumulated buffer into the progress widget.
+// It must run on the UI thread (called via fyne.Do or from another UI-thread
+// callback). Clearing progressPending under the lock allows the next event to
+// schedule a fresh flush.
+func (ui *UI) flushProgressLog() {
+	ui.progressMu.Lock()
+	text := ui.progressBuf.String()
+	ui.progressPending = false
+	ui.progressMu.Unlock()
+	ui.progressLog.SetText(text)
 }
 
 // setControlsEnabled enables or disables all input controls and the Run button.
@@ -190,6 +230,29 @@ func (ui *UI) setControlsEnabled(enabled bool) {
 	}
 }
 
+// positiveIntValidator returns a fyne entry validator that accepts an empty
+// string (the field falls back to the engine default) or an integer in
+// [min, max]. A max of 0 means "no upper bound". The label personalizes the
+// error message shown beneath the field.
+func positiveIntValidator(label string, min, max int) fyne.StringValidator {
+	return func(s string) error {
+		if s == "" {
+			return nil // empty → engine default, handled in options()
+		}
+		v, err := strconv.Atoi(s)
+		if err != nil {
+			return fmt.Errorf("%s must be a whole number", label)
+		}
+		if v < min || (max > 0 && v > max) {
+			if max > 0 {
+				return fmt.Errorf("%s must be between %d and %d", label, min, max)
+			}
+			return fmt.Errorf("%s must be at least %d", label, min)
+		}
+		return nil
+	}
+}
+
 // buildUI constructs all widgets and the window content with correct defaults.
 func (ui *UI) buildUI() {
 	ui.window = ui.app.NewWindow("Coverfixer")
@@ -223,11 +286,13 @@ func (ui *UI) buildUI() {
 	ui.resizeEmbeddedCheck = widget.NewCheck("Resize embedded", nil)
 	ui.resizeEmbeddedCheck.SetChecked(false)
 
-	// --- Numeric entries ---
+	// --- Numeric entries (with validators for inline feedback) ---
 	ui.artSizeEntry = widget.NewEntry()
+	ui.artSizeEntry.Validator = positiveIntValidator("Art size", 1, 0)
 	ui.artSizeEntry.SetText("500")
 
 	ui.qualityEntry = widget.NewEntry()
+	ui.qualityEntry.Validator = positiveIntValidator("JPEG quality", 1, 100)
 	ui.qualityEntry.SetText("85")
 
 	// --- Transcode select ---
@@ -253,11 +318,13 @@ func (ui *UI) buildUI() {
 	ui.progressLog.SetPlaceHolder("Progress will appear here…")
 	ui.progressLog.Disable() // read-only; programmatic SetText still works
 
-	// --- Summary label ---
+	// --- Summary label (wraps so long content doesn't overflow) ---
 	ui.summaryLabel = widget.NewLabel("")
+	ui.summaryLabel.Wrapping = fyne.TextWrapWord
 
-	// --- Error label ---
+	// --- Error label (wraps so long engine errors stay readable) ---
 	ui.errorLabel = widget.NewLabel("")
+	ui.errorLabel.Wrapping = fyne.TextWrapWord
 
 	// --- Layout ---
 	folderRow := container.NewHBox(ui.folderBtn, ui.pathLabel)
@@ -285,7 +352,6 @@ func (ui *UI) buildUI() {
 	entryRow := container.NewHBox(artSizeForm, qualityForm)
 
 	transcodeRow := container.NewHBox(widget.NewLabel("Transcode:"), ui.transcodeSelect)
-	backupRow := container.NewHBox(ui.backupCheck)
 
 	buttonsRow := container.NewHBox(ui.runBtn, ui.cancelBtn)
 
@@ -305,7 +371,7 @@ func (ui *UI) buildUI() {
 		checkRow,
 		entryRow,
 		transcodeRow,
-		backupRow,
+		ui.backupCheck,
 		widget.NewSeparator(),
 		buttonsRow,
 		widget.NewSeparator(),
