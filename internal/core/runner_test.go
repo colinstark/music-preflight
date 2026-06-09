@@ -1,0 +1,108 @@
+package core
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestRunArtworkPasses(t *testing.T) {
+	root := t.TempDir()
+
+	// Album A: oversized embedded art + a stray (non-cover) jpg.
+	albumA := filepath.Join(root, "Artist", "Album A")
+	if err := os.MkdirAll(albumA, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMP3WithArt(t, filepath.Join(albumA, "01.mp3"), makeJPEG(t, 1500, 1500))
+	if err := os.WriteFile(filepath.Join(albumA, "folder.jpg"), makeJPEG(t, 1200, 1200), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Album B: oversized embedded art, no jpg on disk.
+	albumB := filepath.Join(root, "Artist", "Album B")
+	if err := os.MkdirAll(albumB, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMP3WithArt(t, filepath.Join(albumB, "01.mp3"), makeJPEG(t, 900, 900))
+
+	o := DefaultOptions()
+	o.Dir = root
+	o.ResizeEmbedded = true
+
+	rep, err := Run(context.Background(), o, nil)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if rep.Failed != 0 {
+		t.Fatalf("Run reported %d failures", rep.Failed)
+	}
+
+	// Album A: stray jpg renamed to cover.jpg and resized.
+	coverA := filepath.Join(albumA, "cover.jpg")
+	if !fileExists(coverA) {
+		t.Error("Album A cover.jpg not created from stray jpg")
+	} else if w, h := jpegDimensions(t, readFile(t, coverA)); w > 500 || h > 500 {
+		t.Errorf("Album A cover %dx%d, want <= 500", w, h)
+	}
+	if fileExists(filepath.Join(albumA, "folder.jpg")) {
+		t.Error("Album A folder.jpg should have been renamed away")
+	}
+
+	// Album B: cover.jpg extracted from embedded art.
+	coverB := filepath.Join(albumB, "cover.jpg")
+	if !fileExists(coverB) {
+		t.Error("Album B cover.jpg not extracted from embedded art")
+	} else if w, h := jpegDimensions(t, readFile(t, coverB)); w > 500 || h > 500 {
+		t.Errorf("Album B cover %dx%d, want <= 500", w, h)
+	}
+
+	// Embedded art in both tracks resized to within bounds.
+	if rep.EmbeddedResized < 1 {
+		t.Errorf("expected embedded art to be resized, got %d", rep.EmbeddedResized)
+	}
+	artA, _ := readMP3Art(filepath.Join(albumA, "01.mp3"))
+	if w, h := jpegDimensions(t, artA); w > 500 || h > 500 {
+		t.Errorf("Album A embedded art %dx%d, want <= 500", w, h)
+	}
+}
+
+func TestRunDryRunMakesNoChanges(t *testing.T) {
+	root := t.TempDir()
+	album := filepath.Join(root, "Album")
+	if err := os.MkdirAll(album, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMP3WithArt(t, filepath.Join(album, "01.mp3"), makeJPEG(t, 1500, 1500))
+
+	o := DefaultOptions()
+	o.Dir = root
+	o.ResizeEmbedded = true
+	o.DryRun = true
+
+	rep, err := Run(context.Background(), o, nil)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if fileExists(filepath.Join(album, "cover.jpg")) {
+		t.Error("dry-run created cover.jpg")
+	}
+	// Embedded art must remain oversized (untouched).
+	art, _ := readMP3Art(filepath.Join(album, "01.mp3"))
+	if w, _ := jpegDimensions(t, art); w <= 500 {
+		t.Error("dry-run modified embedded art")
+	}
+	if rep.Extracted == 0 && rep.EmbeddedResized == 0 {
+		t.Error("dry-run should still report intended actions")
+	}
+}
+
+func readFile(t *testing.T, path string) []byte {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
