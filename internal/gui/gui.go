@@ -5,6 +5,7 @@ package gui
 
 import (
 	"context"
+	"errors"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -43,7 +44,12 @@ type UI struct {
 
 	// State
 	selectedDir string
-	cancelCtx   context.CancelFunc
+	cancelFn    context.CancelFunc
+	running     bool
+	runDone     chan struct{} // closed when a run completes (for test sync)
+
+	// Error display
+	errorLabel *widget.Label
 }
 
 // New creates a UI that uses the real core.Run engine.
@@ -75,6 +81,112 @@ func (ui *UI) setSelectedFolder(dir string) {
 		ui.runBtn.Disable()
 	} else {
 		ui.runBtn.Enable()
+	}
+}
+
+// onRun is the Run button callback. It reads the current options, disables
+// controls, clears prior output, and invokes the runner in a goroutine with
+// a fresh cancelable context. Guard against double-invocation while a run is active.
+func (ui *UI) onRun() {
+	if ui.running || ui.selectedDir == "" {
+		return
+	}
+	ui.running = true
+	ui.runDone = make(chan struct{})
+
+	// Clear prior output
+	ui.progressLog.SetText("")
+	ui.summaryLabel.SetText("")
+	ui.errorLabel.SetText("")
+
+	// Disable input controls and Run; enable Cancel
+	ui.setControlsEnabled(false)
+	ui.cancelBtn.Enable()
+
+	// Create cancelable context
+	ctx, cancel := context.WithCancel(context.Background())
+	ui.cancelFn = cancel
+
+	// Capture options before starting the goroutine
+	opts := ui.options()
+
+	go func() {
+		report, err := ui.run(ctx, opts, ui.progressCallback)
+
+		fyne.Do(func() {
+			defer func() {
+				ui.running = false
+				ui.cancelFn = nil
+				ui.setControlsEnabled(true)
+				ui.cancelBtn.Disable()
+				close(ui.runDone)
+			}()
+
+			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					// User cancelled — just return to idle
+				} else {
+					ui.errorLabel.SetText(err.Error())
+				}
+			} else {
+				ui.summaryLabel.SetText(formatReport(report))
+			}
+		})
+	}()
+}
+
+// onCancel is the Cancel button callback. It cancels the in-flight run's context.
+func (ui *UI) onCancel() {
+	if ui.cancelFn != nil {
+		ui.cancelFn()
+		ui.cancelFn = nil
+	}
+}
+
+// progressCallback is the engine progress callback. It runs on the worker
+// goroutine, so all widget updates are marshaled to the UI thread via fyne.Do.
+func (ui *UI) progressCallback(e core.Event) {
+	line := formatEvent(e)
+	fyne.Do(func() {
+		cur := ui.progressLog.Text
+		if cur != "" {
+			cur += "\n"
+		}
+		ui.progressLog.SetText(cur + line)
+	})
+}
+
+// setControlsEnabled enables or disables all input controls and the Run button.
+// The Cancel button is managed separately by the run lifecycle.
+func (ui *UI) setControlsEnabled(enabled bool) {
+	if enabled {
+		ui.folderBtn.Enable()
+		ui.dryRunCheck.Enable()
+		ui.recursiveCheck.Enable()
+		ui.renameStrayCheck.Enable()
+		ui.resizeCoverCheck.Enable()
+		ui.extractCheck.Enable()
+		ui.resizeEmbeddedCheck.Enable()
+		ui.artSizeEntry.Enable()
+		ui.qualityEntry.Enable()
+		ui.transcodeSelect.Enable()
+		ui.backupCheck.Enable()
+		if ui.selectedDir != "" {
+			ui.runBtn.Enable()
+		}
+	} else {
+		ui.folderBtn.Disable()
+		ui.dryRunCheck.Disable()
+		ui.recursiveCheck.Disable()
+		ui.renameStrayCheck.Disable()
+		ui.resizeCoverCheck.Disable()
+		ui.extractCheck.Disable()
+		ui.resizeEmbeddedCheck.Disable()
+		ui.artSizeEntry.Disable()
+		ui.qualityEntry.Disable()
+		ui.transcodeSelect.Disable()
+		ui.backupCheck.Disable()
+		ui.runBtn.Disable()
 	}
 }
 
@@ -130,10 +242,11 @@ func (ui *UI) buildUI() {
 	ui.backupCheck.SetChecked(false)
 
 	// --- Run and Cancel buttons ---
-	ui.runBtn = widget.NewButton("Run", nil)
+	ui.runBtn = widget.NewButton("Run", ui.onRun)
 	ui.runBtn.Disable() // disabled until a folder is selected
 
-	ui.cancelBtn = widget.NewButton("Cancel", nil)
+	ui.cancelBtn = widget.NewButton("Cancel", ui.onCancel)
+	ui.cancelBtn.Disable() // nothing to cancel initially
 
 	// --- Progress log (scrolling, read-only) ---
 	ui.progressLog = widget.NewMultiLineEntry()
@@ -142,6 +255,9 @@ func (ui *UI) buildUI() {
 
 	// --- Summary label ---
 	ui.summaryLabel = widget.NewLabel("")
+
+	// --- Error label ---
+	ui.errorLabel = widget.NewLabel("")
 
 	// --- Layout ---
 	folderRow := container.NewHBox(ui.folderBtn, ui.pathLabel)
@@ -180,6 +296,7 @@ func (ui *UI) buildUI() {
 	summaryBox := container.NewVBox(
 		widget.NewLabel("Summary:"),
 		ui.summaryLabel,
+		ui.errorLabel,
 	)
 
 	content := container.NewVBox(
