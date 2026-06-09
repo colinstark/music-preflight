@@ -30,3 +30,13 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# macOS
+.DS_Store
+
+# Bundled static ffmpeg binaries (fetched by `make fetch-ffmpeg`, not committed)
+internal/ffmpeg/bin/
+
+# Build output
+/dist/
+/coverfixer
