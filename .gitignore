@@ -40,3 +40,4 @@ internal/ffmpeg/bin/
 # Build output
 /dist/
 /coverfixer
+/coverfixer-gui
