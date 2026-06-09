@@ -22,7 +22,13 @@ func formatEvent(e core.Event) string {
 		}
 		return fmt.Sprintf("[SKIP] %s: %s", e.Op, e.Path)
 	case core.EventError:
-		return fmt.Sprintf("[ERR] %s: %s: %v", e.Op, e.Path, e.Err)
+		if e.Err != nil {
+			return fmt.Sprintf("[ERR] %s: %s: %v", e.Op, e.Path, e.Err)
+		}
+		if e.Detail != "" {
+			return fmt.Sprintf("[ERR] %s: %s (%s)", e.Op, e.Path, e.Detail)
+		}
+		return fmt.Sprintf("[ERR] %s: %s", e.Op, e.Path)
 	default: // EventInfo
 		if e.Detail != "" {
 			return fmt.Sprintf("[INFO] %s: %s (%s)", e.Op, e.Path, e.Detail)

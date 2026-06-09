@@ -651,23 +651,19 @@ func TestNewRunResetsSummary(t *testing.T) {
 	report1 := core.Report{CoversResized: 5, Skipped: 3}
 	report2 := core.Report{Renamed: 1, Extracted: 2}
 
-	var callIdx int32
-	hold1 := make(chan struct{})
-	ui := newTestUIWithRunner(func(ctx context.Context, opts core.Options, progress func(core.Event)) (core.Report, error) {
-		idx := atomic.AddInt32(&callIdx, 1)
-		if idx == 1 {
-			<-hold1 // block first call
-			return report1, nil
-		}
-		return report2, nil
-	})
+	// First run uses a blocking fake runner so we can confirm it's in flight.
+	fr1 := &fakeRunner{
+		started: make(chan struct{}),
+		hold:    make(chan struct{}),
+		report:  report1,
+	}
+	ui := newTestUIWithRunner(fr1.run)
 	ui.setSelectedFolder("/tmp/test-music")
 
 	// First run
 	test.Tap(ui.runBtn)
-	// Wait for the first run to be in flight
-	time.Sleep(50 * time.Millisecond) // let the goroutine start
-	close(hold1)                      // release the first run
+	waitForRunnerStart(t, fr1, 3*time.Second) // deterministic sync
+	close(fr1.hold)                           // release the first run
 	waitForRunDone(t, ui, 3*time.Second)
 
 	summary1 := ui.summaryLabel.Text
@@ -675,7 +671,10 @@ func TestNewRunResetsSummary(t *testing.T) {
 		t.Errorf("after first run, summary should contain report1 data, got: %q", summary1)
 	}
 
-	// Second run
+	// Second run uses an immediate fake runner returning report2.
+	fr2 := newImmediateFakeRunner(nil, report2, nil)
+	ui.run = fr2.run // swap to the second runner
+
 	test.Tap(ui.runBtn)
 	waitForRunDone(t, ui, 3*time.Second)
 

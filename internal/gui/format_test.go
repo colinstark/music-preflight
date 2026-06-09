@@ -49,6 +49,34 @@ func TestFormatEventError(t *testing.T) {
 	}
 }
 
+func TestFormatEventErrorNilErr(t *testing.T) {
+	// When Err is nil, formatEvent must not render "<nil>"; it should
+	// produce a readable line using Op/Path (and Detail if present).
+	t.Run("no_detail", func(t *testing.T) {
+		e := core.Event{Kind: core.EventError, Op: "extract", Path: "song.mp3"}
+		got := formatEvent(e)
+		if strings.Contains(got, "<nil>") {
+			t.Errorf("error event with nil Err should not contain '<nil>', got: %q", got)
+		}
+		if !strings.HasPrefix(got, "[ERR]") {
+			t.Errorf("error event should start with [ERR], got: %q", got)
+		}
+		if !strings.Contains(got, "extract") || !strings.Contains(got, "song.mp3") {
+			t.Errorf("error event with nil Err should still contain op and path, got: %q", got)
+		}
+	})
+	t.Run("with_detail", func(t *testing.T) {
+		e := core.Event{Kind: core.EventError, Op: "resize-cover", Path: "cover.jpg", Detail: "corrupt header"}
+		got := formatEvent(e)
+		if strings.Contains(got, "<nil>") {
+			t.Errorf("error event with nil Err should not contain '<nil>', got: %q", got)
+		}
+		if !strings.Contains(got, "corrupt header") {
+			t.Errorf("error event with nil Err and Detail should include detail, got: %q", got)
+		}
+	})
+}
+
 func TestFormatEventInfo(t *testing.T) {
 	e := core.Event{Kind: core.EventInfo, Op: "scan", Path: "/music", Detail: "3 files"}
 	got := formatEvent(e)
