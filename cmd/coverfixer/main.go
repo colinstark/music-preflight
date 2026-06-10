@@ -59,7 +59,10 @@ func main() {
 		fmt.Println("(dry-run — no files will be modified)")
 	}
 
-	rep, err := core.Run(ctx, o, printEvent)
+	// Resolve the working directory once; printEvent uses it to shorten paths.
+	wd, _ := os.Getwd()
+
+	rep, err := core.Run(ctx, o, func(e core.Event) { printEvent(wd, e) })
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "coverfixer:", err)
 		os.Exit(1)
@@ -71,14 +74,17 @@ func main() {
 	}
 }
 
-func printEvent(e core.Event) {
+func printEvent(wd string, e core.Event) {
 	rel := e.Path
-	if wd, err := os.Getwd(); err == nil {
+	if wd != "" {
 		if r, err := filepath.Rel(wd, e.Path); err == nil && len(r) < len(rel) {
 			rel = r
 		}
 	}
 	switch e.Kind {
+	case core.EventInfo:
+		// Folder header: a blank line then the path, grouping the events below it.
+		fmt.Printf("\n%s\n", rel)
 	case core.EventAction:
 		if e.Detail != "" {
 			fmt.Printf("  %-16s %s  %s\n", e.Op, rel, e.Detail)

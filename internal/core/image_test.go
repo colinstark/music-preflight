@@ -43,6 +43,46 @@ func TestResizeArtworkDownscales(t *testing.T) {
 	}
 }
 
+func TestIsProgressiveJPEG(t *testing.T) {
+	// Minimal hand-built marker streams (image/jpeg only emits baseline, so we
+	// can't synthesize a real progressive file via the encoder).
+	cases := []struct {
+		name string
+		data []byte
+		want bool
+	}{
+		{
+			// SOF2 frame header → progressive.
+			name: "progressive sof2",
+			data: []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x02, 0xFF, 0xC2, 0x00, 0x11},
+			want: true,
+		},
+		{
+			// APP0 payload contains the bytes FF C2 (a trap for a naive byte
+			// scanner), but the real frame header is SOF0 → baseline.
+			name: "baseline with ffc2 in app0 payload",
+			data: []byte{
+				0xFF, 0xD8, // SOI
+				0xFF, 0xE0, 0x00, 0x06, 0xFF, 0xC2, 0x00, 0x00, // APP0, payload holds FF C2
+				0xFF, 0xC0, 0x00, 0x11, // SOF0
+			},
+			want: false,
+		},
+		{
+			name: "not a jpeg",
+			data: []byte{0x89, 0x50, 0x4E, 0x47},
+			want: false,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := isProgressiveJPEG(c.data); got != c.want {
+				t.Errorf("isProgressiveJPEG = %v, want %v", got, c.want)
+			}
+		})
+	}
+}
+
 func TestArtworkNeedsWork(t *testing.T) {
 	big := makeJPEG(t, 1000, 1000)
 	if need, err := artworkNeedsWork(big, 500); err != nil || !need {

@@ -74,20 +74,53 @@ func artworkNeedsWork(src []byte, maxSize int) (bool, error) {
 	return isProgressiveJPEG(src), nil
 }
 
-// isProgressiveJPEG scans the JPEG marker segments for an SOF marker. SOF2
-// (0xFFC2) is progressive; SOF0/SOF1 (0xFFC0/0xFFC1) are baseline. The first SOF
-// encountered is decisive and always precedes the entropy-coded scan data.
+// isProgressiveJPEG walks the JPEG marker segments looking for the frame header.
+// SOF2 (0xFFC2) is progressive; the other SOFn markers are sequential/baseline.
+// The first SOFn is decisive and always precedes the entropy-coded scan data.
+//
+// Segments are skipped by their length field rather than scanning every byte, so
+// arbitrary 0xFFCx bytes inside an APPn/DQT payload (e.g. an embedded EXIF
+// thumbnail) cannot be mistaken for a frame marker.
 func isProgressiveJPEG(b []byte) bool {
-	for i := 0; i+1 < len(b); i++ {
+	if len(b) < 2 || b[0] != 0xFF || b[1] != 0xD8 { // require SOI
+		return false
+	}
+	i := 2
+	for i+1 < len(b) {
 		if b[i] != 0xFF {
-			continue
+			return false // not aligned on a marker; malformed header
 		}
-		switch b[i+1] {
-		case 0xC2:
-			return true
-		case 0xC0, 0xC1:
+		// Skip any 0xFF fill bytes preceding the marker code.
+		j := i + 1
+		for j < len(b) && b[j] == 0xFF {
+			j++
+		}
+		if j >= len(b) {
 			return false
 		}
+		marker := b[j]
+		i = j + 1
+
+		switch {
+		case marker == 0xC2:
+			return true // SOF2 = progressive
+		case marker >= 0xC0 && marker <= 0xCF &&
+			marker != 0xC4 && marker != 0xC8 && marker != 0xCC:
+			return false // a non-progressive SOFn (C4=DHT, C8=JPG, CC=DAC are not SOF)
+		case marker == 0x01 || (marker >= 0xD0 && marker <= 0xD9):
+			continue // standalone markers (TEM, RSTn, SOI, EOI): no length payload
+		case marker == 0xDA:
+			return false // SOS: scan data begins; any SOF would have appeared already
+		}
+		// Marker segment with a 2-byte big-endian length (which includes itself).
+		if i+1 >= len(b) {
+			return false
+		}
+		length := int(b[i])<<8 | int(b[i+1])
+		if length < 2 {
+			return false
+		}
+		i += length
 	}
 	return false
 }

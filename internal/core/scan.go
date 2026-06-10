@@ -73,6 +73,9 @@ func scan(root string, recursive bool) ([]*albumFolder, error) {
 				f.hasCover = true
 			}
 		case ".mp3", ".m4a", ".aac":
+			// Raw .aac (ADTS) has no tag container, so classifyAudio maps it to
+			// audioOther and the artwork passes skip it; it is still collected
+			// here because it remains a valid transcode source.
 			get(dir).audio = append(get(dir).audio, path)
 		}
 		return nil

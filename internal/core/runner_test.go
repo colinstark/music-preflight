@@ -98,6 +98,46 @@ func TestRunDryRunMakesNoChanges(t *testing.T) {
 	}
 }
 
+func TestRunEmitsFolderHeaders(t *testing.T) {
+	root := t.TempDir()
+
+	// Working folder: has a jpg the artwork passes will touch.
+	work := filepath.Join(root, "Has Work")
+	if err := os.MkdirAll(work, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(work, "cover.jpg"), makeJPEG(t, 1200, 1200), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Idle folder: a lone audio file with no art and only artwork passes enabled,
+	// so no enabled pass acts on it.
+	idle := filepath.Join(root, "Idle")
+	if err := os.MkdirAll(idle, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMP3WithArt(t, filepath.Join(idle, "01.mp3"), nil)
+
+	o := DefaultOptions()
+	o.Dir = root
+	o.ExtractCover = false // the idle folder's only candidate pass — keep it idle
+	o.ResizeEmbedded = false
+
+	var headers []string
+	_, err := Run(context.Background(), o, func(e Event) {
+		if e.Kind == EventInfo {
+			headers = append(headers, e.Path)
+		}
+	})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	if len(headers) != 1 || headers[0] != work {
+		t.Errorf("folder headers = %v, want exactly [%q]", headers, work)
+	}
+}
+
 func readFile(t *testing.T, path string) []byte {
 	t.Helper()
 	b, err := os.ReadFile(path)

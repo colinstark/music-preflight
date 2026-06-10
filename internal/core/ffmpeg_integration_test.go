@@ -102,4 +102,21 @@ func TestTranscodeToMP3(t *testing.T) {
 	if !fileExists(src + ".bak") {
 		t.Error("expected backup of original .m4a")
 	}
+
+	// The 800px source cover is copied into the mp3 by ffmpeg; with ResizeEmbedded
+	// off the transcode pass must still size it down to ArtSize on the output.
+	art, err := readMP3Art(mp3)
+	if err != nil {
+		t.Fatalf("readMP3Art: %v", err)
+	}
+	if art == nil {
+		t.Fatal("expected embedded cover carried into mp3")
+	}
+	if w, h := jpegDimensions(t, art); w > 500 || h > 500 {
+		t.Errorf("transcoded mp3 art %dx%d, want <= 500", w, h)
+	}
+	// Resizing the fresh output must not leave a backup of the output itself.
+	if fileExists(mp3 + ".bak") {
+		t.Error("transcode output should not be backed up")
+	}
 }

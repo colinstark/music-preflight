@@ -25,6 +25,13 @@ func Run(ctx context.Context, o Options, progress func(Event)) (Report, error) {
 			return rep, err
 		}
 
+		// Announce the folder once, before its passes run, so front-ends can
+		// group the per-file events that follow under a header. Skipped for
+		// folders no enabled pass will touch, to avoid empty headers.
+		if folderHasWork(o, f) {
+			rep.info(progress, "scan", f.dir, "")
+		}
+
 		// Pass 1: rename stray jpgs + resize cover.jpg.
 		if o.RenameStrayJPG || o.ResizeCoverJPG {
 			processJPGs(o, f, &rep, progress)
@@ -53,6 +60,24 @@ func Run(ctx context.Context, o Options, progress func(Event)) (Report, error) {
 		}
 	}
 	return rep, nil
+}
+
+// folderHasWork reports whether any enabled pass will act on f, mirroring the
+// pass gates below. Used to suppress folder-header events for folders that will
+// produce no further output.
+func folderHasWork(o Options, f *albumFolder) bool {
+	switch {
+	case (o.RenameStrayJPG || o.ResizeCoverJPG) && len(f.jpgs) > 0:
+		return true
+	case o.ExtractCover && !f.hasCover && len(f.audio) > 0:
+		return true
+	case o.ResizeEmbedded && len(f.audio) > 0:
+		return true
+	case o.Transcode != TranscodeNone && len(f.audio) > 0:
+		return true
+	default:
+		return false
+	}
 }
 
 func resizeEmbedded(o Options, path string, rep *Report, progress func(Event)) {

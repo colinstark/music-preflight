@@ -66,20 +66,56 @@ func transcodeFile(ctx context.Context, o Options, path string, rep *Report, pro
 		rep.fail(progress, "transcode", path, err)
 		return nil
 	}
-	// When the extension changes, remove the original so the converted file
-	// takes its place (the .bak copy, if any, is the safety net).
+
+	// Install the converted file. When the extension changes the original has a
+	// different name and must be removed for the output to take its place; move
+	// it aside first rather than deleting outright, so a failed install can be
+	// rolled back and there is never a window where the source is gone and the
+	// output is not yet in place. Same-extension output is an atomic overwrite.
 	if outPath != path {
-		if err := os.Remove(path); err != nil {
+		aside := path + ".coverfixer.orig"
+		if err := os.Rename(path, aside); err != nil {
 			os.Remove(tmp)
 			rep.fail(progress, "transcode", path, err)
 			return nil
 		}
-	}
-	if err := os.Rename(tmp, outPath); err != nil {
+		if err := os.Rename(tmp, outPath); err != nil {
+			os.Rename(aside, path) // restore the original
+			os.Remove(tmp)
+			rep.fail(progress, "transcode", path, err)
+			return nil
+		}
+		os.Remove(aside)
+	} else if err := os.Rename(tmp, outPath); err != nil {
 		os.Remove(tmp)
 		rep.fail(progress, "transcode", path, err)
 		return nil
 	}
+
+	// ffmpeg copies the source cover stream verbatim (-c:v copy), so when the
+	// standalone embedded-art pass wasn't requested the new file would otherwise
+	// keep full-size art. Resize the carried-over cover in place so transcoded
+	// output always ends up correctly sized. Backup is forced off here: outPath
+	// is a freshly written file, not a user original.
+	if err := resizeOutputArt(o, outPath); err != nil {
+		rep.fail(progress, "transcode", outPath, err)
+		return nil
+	}
+
 	rep.Transcoded++
 	return nil
+}
+
+// resizeOutputArt resizes the embedded cover in a transcode output in place,
+// without writing a .bak sidecar.
+func resizeOutputArt(o Options, path string) error {
+	o.Backup = false
+	var err error
+	switch classifyAudio(path) {
+	case audioMP3:
+		_, err = resizeMP3Art(o, path)
+	case audioM4A:
+		_, err = resizeM4AArt(o, path)
+	}
+	return err
 }
