@@ -25,7 +25,10 @@ core.Run(ctx, core.Options{...}, func(core.Event){ ... }) (core.Report, error)
 ```
 
 - `cmd/coverfixer` — the command-line front-end (stdlib `flag`).
-- `cmd/coverfixer-gui` + `internal/gui` — a native Fyne desktop front-end.
+- `cmd/coverfixer-gui` + `internal/ui` — a native desktop front-end built with
+  [Wails](https://wails.io) (HTML/CSS/JS UI over a Go backend). `internal/ui`
+  owns the run lifecycle and formatting; it depends on no GUI or Wails type, so
+  it is fully unit-testable headless.
 
 ## CLI
 
@@ -62,30 +65,43 @@ embedded resized, transcoded, skipped, failed).
 
 ## GUI
 
-`cmd/coverfixer-gui` is a native desktop app built with [Fyne](https://fyne.io) that
-drives the same `core.Run` engine. It exposes full `core.Options` parity: a folder
-picker, toggles for each pass (recursive, rename stray jpg, resize `cover.jpg`, extract
-cover, resize embedded), art-size and JPEG-quality entries, a transcode dropdown
-(`none` / `mp3-320` / `aac-256`), and a backup toggle. It shows a live progress log, a
-summary of result counters, and Run / Cancel buttons.
+`cmd/coverfixer-gui` is a native desktop app built with
+[Wails](https://wails.io) (v2): the UI is plain HTML/CSS/JS served from
+`frontend/dist/`, and the backend is Go driving the same `core.Run` engine. It
+exposes full `core.Options` parity: a folder picker, toggles for each pass
+(recursive, rename stray jpg, resize `cover.jpg`, extract cover, resize
+embedded), art-size and JPEG-quality entries, a transcode dropdown
+(`none` / `mp3-320` / `aac-256`), and a backup toggle. It shows a live progress
+log, a summary of result counters, and Run / Cancel buttons.
 
 For safety, the GUI **defaults to dry-run** — untick the Dry-run checkbox to apply changes.
 
 ```sh
-go build -o coverfixer-gui ./cmd/coverfixer-gui
-./coverfixer-gui
+go install github.com/wailsapp/wails/v2/cmd/wails@latest   # one-time Wails CLI install
+make build-gui                                             # → cmd/coverfixer-gui/build/bin/
+make gui-dev                                               # live-reload dev session
 ```
 
-Building the GUI requires **CGO** (Fyne uses OpenGL):
+The frontend is served from committed static files in
+`cmd/coverfixer-gui/frontend/dist/` — there is **no bundler or node build step**
+for the GUI; `make check` (Go fmt/vet/lint/test) needs neither node nor the
+Wails CLI. The Wails CLI is only required for `gui-dev`, `build-gui`, and
+`release-gui`.
+
+Wails v2 renders via the OS webview, so **CGO is not required** on macOS
+(WKWebView) or Windows (WebView2). Building the GUI still needs the platform
+toolchain Wails links against:
 
 - **macOS:** Xcode Command Line Tools (`xcode-select --install`).
-- **Linux:** X11 and OpenGL development headers (e.g. `libgl1-mesa-dev`, `xorg-dev`).
+- **Linux:** `libwebkit2gtk-4.1-dev` and `libgtk-3-dev` (replaces Fyne's X11/OpenGL headers).
+- **Windows:** WebView2 runtime (built into Windows 11; a small runtime on Windows 10).
 
 ## Build / run / test
 
 ```sh
 make build                       # dev CLI binary (uses system ffmpeg for transcode)
 make run DIR=/path/to/music ARGS="--dry-run"
+make build-gui                   # GUI app (Wails; requires the wails CLI)
 make check                       # the project gate: fmt-check + vet + lint + test
 go test ./...
 ```
@@ -107,6 +123,7 @@ Transcoding requires ffmpeg, which is resolved in two build variants:
 ```sh
 make fetch-ffmpeg     # downloads a static ffmpeg into internal/ffmpeg/bin/ (gitignored)
 make release          # go build -tags embed_ffmpeg → dist/coverfixer-<os>-<arch>
+make release-gui      # wails build -tags embed_ffmpeg → cmd/coverfixer-gui/build/bin/
 ```
 
 > **License note:** the static ffmpeg builds include libmp3lame and are GPL. A binary

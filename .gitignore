@@ -41,3 +41,8 @@ internal/ffmpeg/bin/
 /dist/
 /coverfixer
 /coverfixer-gui
+
+# Wails GUI build artifacts and generated bindings
+cmd/coverfixer-gui/build/bin/
+cmd/coverfixer-gui/frontend/wailsjs/
+node_modules/

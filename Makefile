@@ -2,11 +2,12 @@
 
 BINARY      := coverfixer
 CMD         := ./cmd/coverfixer
+GUI_DIR     := ./cmd/coverfixer-gui
 FFMPEG_DIR  := internal/ffmpeg/bin
 GOOS        := $(shell go env GOOS)
 GOARCH      := $(shell go env GOARCH)
 
-.PHONY: check fmt fmt-check vet lint test build run release fetch-ffmpeg clean
+.PHONY: check fmt fmt-check vet lint test build run release fetch-ffmpeg clean gui-dev build-gui release-gui
 
 ## check: the project gate — formatting, vet, lint, and tests must all pass.
 check: fmt-check vet lint test
@@ -54,6 +55,18 @@ release: fetch-ffmpeg
 fetch-ffmpeg:
 	@mkdir -p $(FFMPEG_DIR)
 	@./scripts/fetch-ffmpeg.sh $(GOOS) $(GOARCH) $(FFMPEG_DIR)
+
+## gui-dev: run the Wails GUI with live reload. Requires the `wails` CLI (go install github.com/wailsapp/wails/v2/cmd/wails@latest).
+gui-dev:
+	cd $(GUI_DIR) && wails dev
+
+## build-gui: build the GUI app (uses system ffmpeg for transcode). Requires the `wails` CLI.
+build-gui:
+	cd $(GUI_DIR) && wails build
+
+## release-gui: build a self-contained GUI with ffmpeg embedded. Requires `make fetch-ffmpeg` first, plus the `wails` CLI.
+release-gui: fetch-ffmpeg
+	cd $(GUI_DIR) && wails build -tags embed_ffmpeg
 
 ## clean: remove build artifacts (keeps fetched ffmpeg binaries).
 clean:
