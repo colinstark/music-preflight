@@ -15,7 +15,7 @@ func Run(ctx context.Context, o Options, progress func(Event)) (Report, error) {
 	o.applyDefaults()
 
 	var rep Report
-	folders, err := scan(o.Dir, o.Recursive)
+	folders, err := scan(o.Dir, o.Recursive, &rep, progress)
 	if err != nil {
 		return rep, err
 	}

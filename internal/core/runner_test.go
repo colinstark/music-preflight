@@ -189,3 +189,54 @@ func readFile(t *testing.T, path string) []byte {
 	}
 	return b
 }
+
+// TestScanSkipsUnreadableSubdir verifies that one locked subdirectory does not
+// abort the whole run: the unreadable dir is recorded as a failure and the
+// remaining readable folders are still processed.
+func TestScanSkipsUnreadableSubdir(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("running as root; chmod would be ignored")
+	}
+	root := t.TempDir()
+
+	// Readable album whose cover will be processed.
+	album := filepath.Join(root, "Album")
+	if err := os.MkdirAll(album, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(album, "cover.jpg"), makeJPEG(t, 900, 900), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Locked subdir: its contents must not abort the run.
+	locked := filepath.Join(root, "Locked")
+	if err := os.MkdirAll(locked, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(locked, "cover.jpg"), makeJPEG(t, 900, 900), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(locked, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chmod(locked, 0o755) // restore so t.TempDir cleanup can remove it
+
+	o := DefaultOptions()
+	o.Dir = root
+
+	var sawErr bool
+	rep, err := Run(context.Background(), o, func(e Event) {
+		if e.Kind == EventError {
+			sawErr = true
+		}
+	})
+	if err != nil {
+		t.Fatalf("an unreadable subdir aborted the entire run: %v", err)
+	}
+	if !sawErr || rep.Failed == 0 {
+		t.Error("expected the unreadable subdir to be recorded as a failure")
+	}
+	if rep.CoversResized < 1 {
+		t.Error("expected the readable album to still be processed")
+	}
+}

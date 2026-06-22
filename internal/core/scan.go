@@ -39,7 +39,11 @@ func classifyAudio(path string) audioKind {
 // scan walks root and groups files into albumFolders. AppleDouble (._*) sidecar
 // files are ignored, matching the original shell script. Results are sorted for
 // deterministic processing order.
-func scan(root string, recursive bool) ([]*albumFolder, error) {
+//
+// An unreadable root is returned as an error (engine-level). An unreadable
+// subdirectory or file is recorded as a per-entry failure via rep/progress and
+// skipped, so one locked folder does not abort the whole run.
+func scan(root string, recursive bool, rep *Report, progress func(Event)) ([]*albumFolder, error) {
 	folders := map[string]*albumFolder{}
 	get := func(dir string) *albumFolder {
 		f := folders[dir]
@@ -52,7 +56,16 @@ func scan(root string, recursive bool) ([]*albumFolder, error) {
 
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return err
+			if path == root {
+				return err // unreadable/missing root is engine-level
+			}
+			// Unreadable entry: record it and keep going. A directory's
+			// contents are skipped; a file is simply not classified.
+			rep.fail(progress, "scan", path, err)
+			if d != nil && d.IsDir() {
+				return fs.SkipDir
+			}
+			return nil
 		}
 		if d.IsDir() {
 			if !recursive && path != root {
