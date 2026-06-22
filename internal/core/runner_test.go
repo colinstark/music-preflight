@@ -138,6 +138,49 @@ func TestRunEmitsFolderHeaders(t *testing.T) {
 	}
 }
 
+// TestRenameThenExtractDoesNotOverwrite guards against a regression where a
+// stray jpg renamed to cover.jpg in Pass 1 was overwritten by Pass 2's extract
+// pass, because processJPGs failed to propagate the rename to f.hasCover.
+//
+// The stray jpg and the embedded art have distinguishable aspect ratios
+// (landscape vs portrait), so the source of the resulting cover.jpg is
+// unambiguous: it must be the renamed jpg, and Extracted must be 0.
+func TestRenameThenExtractDoesNotOverwrite(t *testing.T) {
+	root := t.TempDir()
+	album := filepath.Join(root, "Album")
+	if err := os.MkdirAll(album, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Stray jpg on disk: landscape 1200x600 → resizes to 500x250.
+	if err := os.WriteFile(filepath.Join(album, "front.jpg"), makeJPEG(t, 1200, 600), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Embedded art: portrait 600x1200 → would resize to 250x500 if extracted.
+	writeMP3WithArt(t, filepath.Join(album, "01.mp3"), makeJPEG(t, 600, 1200))
+
+	o := DefaultOptions() // RenameStrayJPG + ResizeCoverJPG + ExtractCover all on
+	o.Dir = root
+
+	rep, err := Run(context.Background(), o, nil)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	cover := filepath.Join(album, "cover.jpg")
+	if !fileExists(cover) {
+		t.Fatal("cover.jpg not created from renamed stray jpg")
+	}
+	w, h := jpegDimensions(t, readFile(t, cover))
+	if w != 500 || h != 250 {
+		t.Errorf("cover.jpg %dx%d, want 500x250 (from renamed front.jpg); "+
+			"a portrait 250x500 would mean the extract pass overwrote it", w, h)
+	}
+	if rep.Extracted != 0 {
+		t.Errorf("Extracted = %d, want 0 (folder is covered after rename)", rep.Extracted)
+	}
+}
+
 func readFile(t *testing.T, path string) []byte {
 	t.Helper()
 	b, err := os.ReadFile(path)

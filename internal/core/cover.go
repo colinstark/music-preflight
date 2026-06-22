@@ -39,6 +39,7 @@ func processJPGs(o Options, f *albumFolder, rep *Report, progress func(Event)) {
 			rep.Renamed++
 			cur = dst
 			hasCover = true
+			f.hasCover = true // propagate so the extract pass doesn't overwrite the renamed cover
 			isCover = true
 		}
 
