@@ -1,0 +1,12 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "coverfixer-gui",
+  "outputfilename": "coverfixer-gui",
+  "frontend:install": "",
+  "frontend:build": "",
+  "frontend:dev:watcher": "",
+  "author": {
+    "name": "colinstark",
+    "email": "starkinbox@gmail.com"
+  }
+}

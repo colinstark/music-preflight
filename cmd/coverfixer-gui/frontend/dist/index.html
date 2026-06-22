@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Coverfixer</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<main class="app">
+    <section class="folder-row">
+        <button id="folderBtn" class="btn" type="button">Choose Folder</button>
+        <span id="pathLabel" class="path" title="">No folder selected</span>
+    </section>
+    <input type="hidden" id="dir" />
+
+    <hr />
+
+    <section class="options">
+        <div class="checks">
+            <label><input type="checkbox" id="dryRun" /> Dry-run</label>
+            <label><input type="checkbox" id="recursive" /> Recursive</label>
+            <label><input type="checkbox" id="renameStrayJpg" /> Rename stray jpg</label>
+            <label><input type="checkbox" id="resizeCoverJpg" /> Resize cover.jpg</label>
+            <label><input type="checkbox" id="extractCover" /> Extract cover</label>
+            <label><input type="checkbox" id="resizeEmbedded" /> Resize embedded</label>
+            <label><input type="checkbox" id="backup" /> Backup</label>
+        </div>
+        <div class="fields">
+            <label class="field">
+                <span>Art size</span>
+                <input type="number" id="artSize" min="1" step="1" />
+            </label>
+            <label class="field">
+                <span>JPEG quality</span>
+                <input type="number" id="jpegQuality" min="1" max="100" step="1" />
+            </label>
+            <label class="field">
+                <span>Transcode</span>
+                <select id="transcode">
+                    <option value="none">none</option>
+                    <option value="mp3-320">mp3-320</option>
+                    <option value="aac-256">aac-256</option>
+                </select>
+            </label>
+        </div>
+    </section>
+
+    <hr />
+
+    <section class="actions">
+        <button id="runBtn" class="btn btn-primary" type="button" disabled>Run</button>
+        <button id="cancelBtn" class="btn" type="button" disabled>Cancel</button>
+    </section>
+
+    <hr />
+
+    <section class="progress">
+        <label for="log" class="section-label">Progress</label>
+        <pre id="log" class="log" aria-live="polite"></pre>
+    </section>
+
+    <section class="summary">
+        <span class="section-label">Summary</span>
+        <pre id="summary" class="summary-text"></pre>
+        <pre id="error" class="error-text" role="alert"></pre>
+    </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
