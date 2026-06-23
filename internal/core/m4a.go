@@ -41,9 +41,6 @@ func setM4AGenre(o Options, path string) (bool, error) {
 		return true, nil
 	}
 
-	if err := maybeBackup(o, path); err != nil {
-		return false, err
-	}
 	// "customgenre" clears the existing ©gen so we replace rather than append;
 	// other tags are left untouched (merged).
 	if err := mp4.Write(&mp4tag.MP4Tags{CustomGenre: o.Genre}, []string{"customgenre"}); err != nil {
@@ -114,9 +111,6 @@ func resizeM4AArt(o Options, path string) (bool, error) {
 		return true, nil
 	}
 
-	if err := maybeBackup(o, path); err != nil {
-		return false, err
-	}
 	// go-mp4tag appends Pictures rather than replacing them, so clear the
 	// existing covr atom with "allpictures" before writing the rebuilt set.
 	// Other tags are left untouched (merged).

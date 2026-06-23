@@ -72,14 +72,23 @@ func (a *App) OpenFolder() string {
 	return dir
 }
 
-// ReadFirstGenre returns the genre tag of the first audio file under dir, or ""
-// if there is no audio. Used to prefill the GUI's genre field once a folder is
-// picked.
-func (a *App) ReadFirstGenre(dir string) string {
+// ReadFirstMetadata returns the genre and album artist of the first audio file
+// under dir, used to prefill the GUI's metadata fields once a folder is picked.
+func (a *App) ReadFirstMetadata(dir string) core.FirstMetadata {
 	if dir == "" {
-		return ""
+		return core.FirstMetadata{}
 	}
-	return core.ReadFirstGenre(dir)
+	return core.ReadFirstMetadata(dir)
+}
+
+// ReadLibrary scans dir for audio files and returns them grouped by album for
+// the GUI's idle preview (artwork thumbnails, track titles, durations). It is
+// read-only and never mutates files. recursive mirrors the run's scope.
+func (a *App) ReadLibrary(dir string, recursive bool) ([]core.Album, error) {
+	if dir == "" {
+		return nil, nil
+	}
+	return core.ReadLibrary(dir, recursive)
 }
 
 // wailsEmitter adapts ui.Emitter to Wails' runtime.EventsEmit. It is the only

@@ -7,62 +7,81 @@
     <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+<header class="titlebar"><span class="titlebar-title">Music Preflight</span></header>
 <main class="app">
     <section class="folder-row">
+        <svg class="folder-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12.4142 5H21C21.5523 5 22 5.44772 22 6V20C22 20.5523 21.5523 21 21 21H3C2.44772 21 2 20.5523 2 20V4C2 3.44772 2.44772 3 3 3H10.4142L12.4142 5Z"></path></svg>
         <button id="folderBtn" class="btn" type="button">Choose Folder</button>
-        <span id="pathLabel" class="path" title="">No folder selected</span>
+        <span id="pathLabel" class="path">No folder selected</span>
     </section>
     <input type="hidden" id="dir" />
+    <div class="content">
+    <div class="sidebar">
+    <div class="groups">
+    <option-group id="resizeEmbeddedGroup" label="Resize Cover Art">
+        <label class="field">
+            <span>Size</span>
+            <tab-bar id="embeddedArtSize" value="500" options="500,480,320,240"></tab-bar>
+        </label>
+    </option-group>
 
-    <section class="panel options" aria-label="Options">
-        <div class="checks">
-            <label><input type="checkbox" id="dryRun" /> Dry-run</label>
-            <label><input type="checkbox" id="recursive" /> Recursive</label>
-            <label><input type="checkbox" id="renameStrayJpg" /> Rename stray jpg</label>
-            <label><input type="checkbox" id="resizeCoverJpg" /> Resize cover.jpg</label>
-            <label><input type="checkbox" id="extractCover" /> Extract cover</label>
-            <label><input type="checkbox" id="resizeEmbedded" /> Resize embedded</label>
-            <label><input type="checkbox" id="backup" /> Backup</label>
-        </div>
+    <option-group id="coverJpgGroup" label="Extract cover.jpg" checked>
+        <label class="field">
+            <span>Size</span>
+            <tab-bar id="coverJpgSize" value="500" options="500,480,320,240"></tab-bar>
+        </label>
+    </option-group>
+
+    <option-group id="transcodeGroup" label="Transcode">
         <div class="fields">
             <label class="field">
-                <span>Art size</span>
-                <input type="number" id="artSize" min="1" step="1" />
+                <span>Format</span>
+                <tab-bar id="transcodeFormat" value="mp3" options="MP3:mp3,AAC:aac"></tab-bar>
             </label>
             <label class="field">
-                <span>JPEG quality</span>
-                <input type="number" id="jpegQuality" min="1" max="100" step="1" />
+                <span>Quality</span>
+                <tab-bar id="transcodeQuality" value="320" options="320,256,192"></tab-bar>
+            </label>
+        </div>
+    </option-group>
+
+    <option-group id="metadataGroup" label="Metadata">
+        <div class="meta-fields">
+            <label class="field">
+                <span>Album Artist</span>
+                <input type="text" id="albumArtist" placeholder="prefilled on folder pick" autocomplete="off" />
             </label>
             <label class="field">
-                <span>Transcode</span>
-                <select id="transcode">
-                    <option value="none">none</option>
-                    <option value="mp3-320">mp3-320</option>
-                    <option value="aac-256">aac-256</option>
-                </select>
+                <span>Genre</span>
+                <input type="text" id="genre" placeholder="prefilled on folder pick" autocomplete="off" />
             </label>
         </div>
-        <div class="genre-row">
-            <label class="check-inline"><input type="checkbox" id="setGenre" /> Set genre</label>
-            <input type="text" id="genre" placeholder="prefilled on folder pick" autocomplete="off" />
-        </div>
-    </section>
+    </option-group>
+    </div>
 
     <section class="actions">
-        <button id="cancelBtn" class="btn" type="button" disabled>Cancel</button>
+        <div id="progressBar" class="progress-bar" hidden aria-hidden="true"><div class="progress-bar-fill"></div></div>
+        <toggle-switch id="backup" label="Create backup"></toggle-switch>
+        <button id="debugRunBtn" class="btn" type="button">Debug Run</button>
         <button id="runBtn" class="btn btn-primary" type="button" disabled>Run</button>
-    </section>
-
-    <section class="progress" aria-label="Progress">
-        <label for="log" class="panel-header">Progress</label>
-        <pre id="log" class="log" aria-live="polite"></pre>
+        <button id="cancelBtn" class="btn btn-cancel" type="button" hidden>Cancel</button>
     </section>
 
     <section class="summary">
         <pre id="summary" class="summary-text"></pre>
         <pre id="error" class="error-text" role="alert"></pre>
     </section>
+    </div>
+
+    <section id="libraryBlock" class="progress" aria-label="Library" hidden>
+        <div id="preview" class="preview"></div>
+    </section>
+    </div>
 </main>
+<script src="toggle-switch.js"></script>
+<script src="option-group.js"></script>
+<script src="tab-bar.js"></script>
+<script src="preview.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

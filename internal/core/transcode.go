@@ -19,17 +19,29 @@ import (
 func transcodeFile(ctx context.Context, o Options, path string, rep *reportAccum, progress func(Event)) error {
 	var (
 		targetExt string
-		audioArgs []string
+		codec     string
+		bitrate   string
+		aac       bool
 	)
 	switch o.Transcode {
 	case TranscodeMP3_320:
-		targetExt = ".mp3"
-		audioArgs = []string{"-c:a", "libmp3lame", "-b:a", "320k", "-c:v", "copy"}
+		codec, bitrate, targetExt = "libmp3lame", "320k", ".mp3"
+	case TranscodeMP3_256:
+		codec, bitrate, targetExt = "libmp3lame", "256k", ".mp3"
+	case TranscodeMP3_192:
+		codec, bitrate, targetExt = "libmp3lame", "192k", ".mp3"
+	case TranscodeAAC_320:
+		codec, bitrate, targetExt, aac = "aac", "320k", ".m4a", true
 	case TranscodeAAC_256:
-		targetExt = ".m4a"
-		audioArgs = []string{"-c:a", "aac", "-b:a", "256k", "-c:v", "copy", "-disposition:v:0", "attached_pic"}
+		codec, bitrate, targetExt, aac = "aac", "256k", ".m4a", true
+	case TranscodeAAC_192:
+		codec, bitrate, targetExt, aac = "aac", "192k", ".m4a", true
 	default:
 		return nil
+	}
+	audioArgs := []string{"-c:a", codec, "-b:a", bitrate, "-c:v", "copy"}
+	if aac {
+		audioArgs = append(audioArgs, "-disposition:v:0", "attached_pic")
 	}
 
 	outPath := strings.TrimSuffix(path, filepath.Ext(path)) + targetExt
@@ -61,12 +73,6 @@ func transcodeFile(ctx context.Context, o Options, path string, rep *reportAccum
 		return nil
 	}
 
-	if err := maybeBackup(o, path); err != nil {
-		os.Remove(tmp)
-		rep.fail(progress, "transcode", path, err)
-		return nil
-	}
-
 	// Install the converted file. When the extension changes the original has a
 	// different name and must be removed for the output to take its place; move
 	// it aside first rather than deleting outright, so a failed install can be
@@ -95,8 +101,7 @@ func transcodeFile(ctx context.Context, o Options, path string, rep *reportAccum
 	// ffmpeg copies the source cover stream verbatim (-c:v copy), so when the
 	// standalone embedded-art pass wasn't requested the new file would otherwise
 	// keep full-size art. Resize the carried-over cover in place so transcoded
-	// output always ends up correctly sized. Backup is forced off here: outPath
-	// is a freshly written file, not a user original.
+	// output always ends up correctly sized.
 	if err := resizeOutputArt(o, outPath); err != nil {
 		rep.fail(progress, "transcode", outPath, err)
 		return nil
@@ -106,10 +111,8 @@ func transcodeFile(ctx context.Context, o Options, path string, rep *reportAccum
 	return nil
 }
 
-// resizeOutputArt resizes the embedded cover in a transcode output in place,
-// without writing a .bak sidecar.
+// resizeOutputArt resizes the embedded cover in a transcode output in place.
 func resizeOutputArt(o Options, path string) error {
-	o.Backup = false
 	var err error
 	switch classifyAudio(path) {
 	case audioMP3:

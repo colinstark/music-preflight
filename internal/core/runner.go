@@ -20,6 +20,12 @@ func Run(ctx context.Context, o Options, progress func(Event)) (Report, error) {
 		return rep.Report, err
 	}
 
+	// Duplicate the whole selected folder before mutating anything. Done after
+	// scan (so a bad root errors out first) but before the first in-place edit.
+	if err := backupRoot(o, &rep, progress); err != nil {
+		return rep.Report, err
+	}
+
 	for _, f := range folders {
 		if err := ctx.Err(); err != nil {
 			return rep.Report, err

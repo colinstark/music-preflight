@@ -15,6 +15,9 @@ func TestDefaultRequestValues(t *testing.T) {
 	if r.ArtSize != d.ArtSize {
 		t.Errorf("ArtSize = %d, want %d", r.ArtSize, d.ArtSize)
 	}
+	if r.CoverJPGSize != d.CoverJPGSize {
+		t.Errorf("CoverJPGSize = %d, want %d", r.CoverJPGSize, d.CoverJPGSize)
+	}
 	if r.JPEGQuality != d.JPEGQuality {
 		t.Errorf("JPEGQuality = %d, want %d", r.JPEGQuality, d.JPEGQuality)
 	}
@@ -124,7 +127,9 @@ func TestOptionsTranscodeMapping(t *testing.T) {
 		{"", core.TranscodeNone, false},
 		{"none", core.TranscodeNone, false},
 		{"mp3-320", core.TranscodeMP3_320, false},
+		{"mp3-192", core.TranscodeMP3_192, false},
 		{"aac-256", core.TranscodeAAC_256, false},
+		{"aac-320", core.TranscodeAAC_320, false},
 		{"bogus", core.TranscodeNone, true},
 	}
 	for _, tc := range tests {

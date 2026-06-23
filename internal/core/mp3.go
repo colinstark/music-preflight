@@ -33,9 +33,6 @@ func setMP3Genre(o Options, path string) (bool, error) {
 		return true, nil
 	}
 
-	if err := maybeBackup(o, path); err != nil {
-		return false, err
-	}
 	// Delete any existing TCON so SetGenre's AddTextFrame doesn't leave a
 	// duplicate frame alongside the old value.
 	tag.DeleteFrames(tag.CommonID("Content type"))
@@ -108,9 +105,6 @@ func resizeMP3Art(o Options, path string) (bool, error) {
 		return true, nil
 	}
 
-	if err := maybeBackup(o, path); err != nil {
-		return false, err
-	}
 	tag.DeleteFrames(apicID)
 	for _, pf := range rebuilt {
 		tag.AddAttachedPicture(pf)

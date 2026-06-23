@@ -16,14 +16,15 @@ import (
 // gives them a Go unit-test home.
 type RunRequest struct {
 	Dir            string `json:"dir"`
-	ArtSize        int    `json:"artSize"`
+	ArtSize        int    `json:"artSize"`      // EMBEDDED artwork max dimension
+	CoverJPGSize   int    `json:"coverJpgSize"` // cover.jpg max dimension (resize/extract)
 	JPEGQuality    int    `json:"jpegQuality"`
 	Recursive      bool   `json:"recursive"`
 	RenameStrayJPG bool   `json:"renameStrayJpg"`
 	ResizeCoverJPG bool   `json:"resizeCoverJpg"`
 	ExtractCover   bool   `json:"extractCover"`
 	ResizeEmbedded bool   `json:"resizeEmbedded"`
-	Transcode      string `json:"transcode"` // "none" | "mp3-320" | "aac-256"
+	Transcode      string `json:"transcode"` // "none" | "<mp3|aac>-<320|256|192>"
 	SetGenre       bool   `json:"setGenre"`
 	Genre          string `json:"genre"`
 	Backup         bool   `json:"backup"`
@@ -38,6 +39,7 @@ func DefaultRequest() RunRequest {
 	d := core.DefaultOptions()
 	return RunRequest{
 		ArtSize:        d.ArtSize,
+		CoverJPGSize:   d.CoverJPGSize,
 		JPEGQuality:    d.JPEGQuality,
 		Recursive:      d.Recursive,
 		RenameStrayJPG: d.RenameStrayJPG,
@@ -62,6 +64,11 @@ func (r RunRequest) Options() (core.Options, error) {
 		artSize = r.ArtSize
 	}
 
+	coverSize := defs.CoverJPGSize
+	if r.CoverJPGSize > 0 {
+		coverSize = r.CoverJPGSize
+	}
+
 	quality := defs.JPEGQuality
 	if r.JPEGQuality > 0 {
 		q := r.JPEGQuality
@@ -79,6 +86,7 @@ func (r RunRequest) Options() (core.Options, error) {
 	return core.Options{
 		Dir:            r.Dir,
 		ArtSize:        artSize,
+		CoverJPGSize:   coverSize,
 		JPEGQuality:    quality,
 		Recursive:      r.Recursive,
 		RenameStrayJPG: r.RenameStrayJPG,

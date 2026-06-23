@@ -4,20 +4,54 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 )
 
-// maybeBackup writes a <path>.bak copy of the file when o.Backup is set and a
-// backup does not already exist. It is a no-op under DryRun. Call it immediately
-// before the first in-place mutation of a file.
-func maybeBackup(o Options, path string) error {
+// backupRoot duplicates o.Dir (the selected top-most folder) into a sibling
+// "backup" folder before the run mutates anything: <parent>/backup/<rootname>.
+// A pre-existing backup of the same root is replaced so each run produces a
+// fresh snapshot. It is a no-op when Backup is unset or under DryRun, and it
+// never writes per-file .bak sidecars. A returned error is engine-level and
+// aborts the run.
+func backupRoot(o Options, rep *reportAccum, progress func(Event)) error {
 	if !o.Backup || o.DryRun {
 		return nil
 	}
-	bak := path + ".bak"
-	if fileExists(bak) {
-		return nil
+	root := filepath.Clean(o.Dir)
+	dst := filepath.Join(filepath.Dir(root), "backup", filepath.Base(root))
+
+	if fileExists(dst) {
+		if err := os.RemoveAll(dst); err != nil {
+			return fmt.Errorf("remove old backup %q: %w", dst, err)
+		}
 	}
-	return copyFile(path, bak)
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return fmt.Errorf("create backup folder: %w", err)
+	}
+	if err := copyTree(root, dst); err != nil {
+		return fmt.Errorf("backup %q: %w", dst, err)
+	}
+	rep.info(progress, "backup", dst, "")
+	return nil
+}
+
+// copyTree recursively copies the src tree into dst, preserving the directory
+// structure and file permissions. Symlinks are followed by os.Open.
+func copyTree(src, dst string) error {
+	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dst, rel)
+		if info.IsDir() {
+			return os.MkdirAll(target, info.Mode().Perm())
+		}
+		return copyFile(path, target)
+	})
 }
 
 func copyFile(src, dst string) error {
@@ -48,7 +82,7 @@ func copyFile(src, dst string) error {
 	}
 	if err := os.Rename(tmp, dst); err != nil {
 		os.Remove(tmp)
-		return fmt.Errorf("finalize backup: %w", err)
+		return fmt.Errorf("finalize copy: %w", err)
 	}
 	return nil
 }

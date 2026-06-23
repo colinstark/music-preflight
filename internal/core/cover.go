@@ -63,7 +63,7 @@ func resizeCoverFile(o Options, path string, rep *reportAccum, progress func(Eve
 		rep.fail(progress, "resize-cover", path, err)
 		return
 	}
-	need, err := artworkNeedsWork(data, o.ArtSize)
+	need, err := artworkNeedsWork(data, o.CoverJPGSize)
 	if err != nil {
 		rep.fail(progress, "resize-cover", path, err)
 		return
@@ -73,17 +73,13 @@ func resizeCoverFile(o Options, path string, rep *reportAccum, progress func(Eve
 		return
 	}
 
-	resized, err := resizeArtwork(data, o.ArtSize, o.JPEGQuality)
+	resized, err := resizeArtwork(data, o.CoverJPGSize, o.JPEGQuality)
 	if err != nil {
 		rep.fail(progress, "resize-cover", path, err)
 		return
 	}
 	rep.action(progress, "resize-cover", path, "")
 	if !o.DryRun {
-		if err := maybeBackup(o, path); err != nil {
-			rep.fail(progress, "resize-cover", path, err)
-			return
-		}
 		if err := writeFileAtomic(path, resized); err != nil {
 			rep.fail(progress, "resize-cover", path, err)
 			return
@@ -105,7 +101,7 @@ func extractCover(o Options, f *albumFolder, rep *reportAccum, progress func(Eve
 		if art == nil {
 			continue
 		}
-		resized, err := resizeArtwork(art, o.ArtSize, o.JPEGQuality)
+		resized, err := resizeArtwork(art, o.CoverJPGSize, o.JPEGQuality)
 		if err != nil {
 			rep.fail(progress, "extract", a, err)
 			continue

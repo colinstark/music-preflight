@@ -38,8 +38,10 @@ When adding behaviour, put logic in `internal/core` and surface it as an
   - images: `image/jpeg` + `golang.org/x/image/draw` (`image.go`) — baseline JPEG.
   - MP3 art: `github.com/bogem/id3v2/v2` (`mp3.go`).
   - M4A art: `github.com/Sorrow446/go-mp4tag` (`m4a.go`).
-- **ffmpeg** is used **only** for transcoding (`transcode.go`). Artwork-only runs
-  never touch it.
+- **ffmpeg** is used for transcoding (`transcode.go`) **and** for the GUI's
+  read-only library preview (`internal/ffmpeg` `Probe`/`ExtractThumb`, consumed
+  by `core.ReadLibrary`): tags, duration, and artwork thumbnails. Artwork-only
+  *runs* never touch it, but the idle preview needs it.
 
 ### Concurrency
 The per-file passes — embedded-art resize (`runner.go`), genre set (`genre.go`),

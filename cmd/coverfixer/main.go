@@ -17,15 +17,16 @@ import (
 func main() {
 	o := core.DefaultOptions()
 
-	flag.IntVar(&o.ArtSize, "size", o.ArtSize, "max artwork dimension; images fit within size×size")
+	flag.IntVar(&o.ArtSize, "size", o.ArtSize, "max EMBEDDED artwork dimension")
+	flag.IntVar(&o.CoverJPGSize, "cover-jpg-size", o.CoverJPGSize, "max cover.jpg dimension (resize/extract)")
 	flag.IntVar(&o.JPEGQuality, "quality", o.JPEGQuality, "baseline JPEG quality (1-100)")
 	flag.BoolVar(&o.RenameStrayJPG, "rename-jpg", o.RenameStrayJPG, "rename a lone non-cover *.jpg to cover.jpg")
 	flag.BoolVar(&o.ResizeCoverJPG, "resize-covers", o.ResizeCoverJPG, "resize existing cover.jpg files")
 	flag.BoolVar(&o.ExtractCover, "extract-cover", o.ExtractCover, "write cover.jpg from embedded art when missing")
 	flag.BoolVar(&o.ResizeEmbedded, "resize-embedded", o.ResizeEmbedded, "resize artwork embedded inside audio files, in place")
-	transcode := flag.String("transcode", "none", "audio conversion: none|mp3-320|aac-256")
+	transcode := flag.String("transcode", "none", "audio conversion: none|<mp3|aac>-<320|256|192>")
 	genre := flag.String("genre", "", "set the genre tag on every audio file to this value (empty = off)")
-	flag.BoolVar(&o.Backup, "backup", o.Backup, "write a <file>.bak copy before modifying a file")
+	flag.BoolVar(&o.Backup, "backup", o.Backup, "duplicate the selected folder into a sibling \"backup\" dir before running")
 	flag.BoolVar(&o.DryRun, "dry-run", o.DryRun, "report intended actions without changing anything")
 	noRecursive := flag.Bool("no-recursive", false, "do not descend into subfolders")
 

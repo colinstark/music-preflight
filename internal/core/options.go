@@ -14,21 +14,38 @@ const (
 	TranscodeNone TranscodeMode = iota
 	// TranscodeMP3_320 converts audio to MP3 CBR 320 kbps.
 	TranscodeMP3_320
+	// TranscodeMP3_256 converts audio to MP3 CBR 256 kbps.
+	TranscodeMP3_256
+	// TranscodeMP3_192 converts audio to MP3 CBR 192 kbps.
+	TranscodeMP3_192
+	// TranscodeAAC_320 converts audio to AAC ~320 kbps in an M4A container.
+	TranscodeAAC_320
 	// TranscodeAAC_256 converts audio to AAC ~256 kbps in an M4A container.
 	TranscodeAAC_256
+	// TranscodeAAC_192 converts audio to AAC ~192 kbps in an M4A container.
+	TranscodeAAC_192
 )
 
-// ParseTranscodeMode maps a CLI string ("none", "mp3-320", "aac-256") to a mode.
+// ParseTranscodeMode maps a "<format>-<bitrate>" string ("none", "mp3-320",
+// "aac-256", ...) to a mode. The bitrate is one of 320/256/192.
 func ParseTranscodeMode(s string) (TranscodeMode, error) {
 	switch s {
 	case "", "none":
 		return TranscodeNone, nil
 	case "mp3-320":
 		return TranscodeMP3_320, nil
+	case "mp3-256":
+		return TranscodeMP3_256, nil
+	case "mp3-192":
+		return TranscodeMP3_192, nil
+	case "aac-320":
+		return TranscodeAAC_320, nil
 	case "aac-256":
 		return TranscodeAAC_256, nil
+	case "aac-192":
+		return TranscodeAAC_192, nil
 	default:
-		return TranscodeNone, fmt.Errorf("invalid transcode mode %q (want none|mp3-320|aac-256)", s)
+		return TranscodeNone, fmt.Errorf("invalid transcode mode %q (want none|<mp3|aac>-<320|256|192>)", s)
 	}
 }
 
@@ -36,8 +53,16 @@ func (m TranscodeMode) String() string {
 	switch m {
 	case TranscodeMP3_320:
 		return "mp3-320"
+	case TranscodeMP3_256:
+		return "mp3-256"
+	case TranscodeMP3_192:
+		return "mp3-192"
+	case TranscodeAAC_320:
+		return "aac-320"
 	case TranscodeAAC_256:
 		return "aac-256"
+	case TranscodeAAC_192:
+		return "aac-192"
 	default:
 		return "none"
 	}
@@ -48,12 +73,13 @@ func (m TranscodeMode) String() string {
 type Options struct {
 	Dir string // root folder to process
 
-	ArtSize     int // max width/height for artwork; images fit within ArtSize×ArtSize
-	JPEGQuality int // baseline JPEG quality (1-100)
+	ArtSize      int // max dimension for EMBEDDED artwork (resize-embedded pass)
+	CoverJPGSize int // max dimension for cover.jpg operations (resize/extract)
+	JPEGQuality  int // baseline JPEG quality (1-100)
 
 	Recursive      bool // descend into subfolders
 	RenameStrayJPG bool // rename a lone non-cover *.jpg to cover.jpg
-	ResizeCoverJPG bool // resize existing cover.jpg to ArtSize baseline JPEG
+	ResizeCoverJPG bool // resize existing cover.jpg to CoverJPGSize baseline JPEG
 	ExtractCover   bool // write cover.jpg from embedded art when a folder lacks one
 	ResizeEmbedded bool // resize artwork embedded inside audio files, in place
 
@@ -62,7 +88,7 @@ type Options struct {
 	SetGenre bool   // set the genre tag on audio files to Genre
 	Genre    string // genre string written when SetGenre is true
 
-	Backup bool // write a <file>.bak copy before mutating a file
+	Backup bool // duplicate the selected folder into a sibling "backup" dir before mutating
 	DryRun bool // report intended actions without changing anything
 }
 
@@ -71,6 +97,7 @@ type Options struct {
 func DefaultOptions() Options {
 	return Options{
 		ArtSize:        500,
+		CoverJPGSize:   500,
 		JPEGQuality:    85,
 		Recursive:      true,
 		RenameStrayJPG: true,
@@ -84,6 +111,9 @@ func DefaultOptions() Options {
 func (o *Options) applyDefaults() {
 	if o.ArtSize <= 0 {
 		o.ArtSize = 500
+	}
+	if o.CoverJPGSize <= 0 {
+		o.CoverJPGSize = 500
 	}
 	if o.JPEGQuality <= 0 || o.JPEGQuality > 100 {
 		o.JPEGQuality = 85

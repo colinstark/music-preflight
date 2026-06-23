@@ -99,8 +99,14 @@ func TestTranscodeToMP3(t *testing.T) {
 	if fileExists(src) {
 		t.Error("original .m4a should have been replaced")
 	}
-	if !fileExists(src + ".bak") {
-		t.Error("expected backup of original .m4a")
+	// Backup is now a full-folder copy under <parent>/backup/<rootname>, not a
+	// .bak sidecar, and it is taken before the run so it holds the original.
+	backupDir := filepath.Join(filepath.Dir(dir), "backup", filepath.Base(dir))
+	if !fileExists(filepath.Join(backupDir, filepath.Base(src))) {
+		t.Error("expected original .m4a duplicated into the backup folder")
+	}
+	if fileExists(src + ".bak") {
+		t.Error("backup must not create .bak sidecars")
 	}
 
 	// The 800px source cover is copied into the mp3 by ffmpeg; with ResizeEmbedded
@@ -114,9 +120,5 @@ func TestTranscodeToMP3(t *testing.T) {
 	}
 	if w, h := jpegDimensions(t, art); w > 500 || h > 500 {
 		t.Errorf("transcoded mp3 art %dx%d, want <= 500", w, h)
-	}
-	// Resizing the fresh output must not leave a backup of the output itself.
-	if fileExists(mp3 + ".bak") {
-		t.Error("transcode output should not be backed up")
 	}
 }
