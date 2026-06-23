@@ -240,3 +240,57 @@ func TestScanSkipsUnreadableSubdir(t *testing.T) {
 		t.Error("expected the readable album to still be processed")
 	}
 }
+
+// TestRunSetsGenre runs the genre pass end-to-end and confirms the tag is
+// written and counted.
+func TestRunSetsGenre(t *testing.T) {
+	root := t.TempDir()
+	album := filepath.Join(root, "Album")
+	if err := os.MkdirAll(album, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMP3WithArt(t, filepath.Join(album, "01.mp3"), makeJPEG(t, 200, 200))
+
+	o := DefaultOptions()
+	o.Dir = root
+	o.RenameStrayJPG = false
+	o.ResizeCoverJPG = false
+	o.ExtractCover = false
+	o.SetGenre = true
+	o.Genre = "Electronic"
+
+	rep, err := Run(context.Background(), o, nil)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if rep.GenresSet != 1 {
+		t.Errorf("GenresSet = %d, want 1", rep.GenresSet)
+	}
+	if g, _ := readMP3Genre(filepath.Join(album, "01.mp3")); g != "Electronic" {
+		t.Errorf("genre = %q, want Electronic", g)
+	}
+}
+
+// TestReadFirstGenre returns the first audio file's genre, used to prefill the
+// GUI field. An album whose first track carries a genre is prefilled with it.
+func TestReadFirstGenre(t *testing.T) {
+	root := t.TempDir()
+	album := filepath.Join(root, "Album")
+	if err := os.MkdirAll(album, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMP3WithArt(t, filepath.Join(album, "01.mp3"), makeJPEG(t, 200, 200))
+
+	o := DefaultOptions()
+	o.Genre = "Jazz"
+	if _, err := setMP3Genre(o, filepath.Join(album, "01.mp3")); err != nil {
+		t.Fatal(err)
+	}
+
+	if g := ReadFirstGenre(root); g != "Jazz" {
+		t.Errorf("ReadFirstGenre = %q, want Jazz", g)
+	}
+	if g := ReadFirstGenre(filepath.Join(root, "no-such-dir")); g != "" {
+		t.Errorf("ReadFirstGenre on missing dir = %q, want empty", g)
+	}
+}

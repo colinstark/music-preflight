@@ -48,8 +48,8 @@ func formatEvent(e core.Event) string {
 // otherwise an enabled-by-default dry-run could read as if files had changed.
 func formatReport(r core.Report, dryRun bool) string {
 	counts := fmt.Sprintf(
-		"Renamed: %d\nCovers Resized: %d\nExtracted: %d\nEmbedded Resized: %d\nTranscoded: %d\nSkipped: %d\nFailed: %d",
-		r.Renamed, r.CoversResized, r.Extracted, r.EmbeddedResized, r.Transcoded, r.Skipped, r.Failed,
+		"Renamed: %d\nCovers Resized: %d\nExtracted: %d\nEmbedded Resized: %d\nTranscoded: %d\nGenres Set: %d\nSkipped: %d\nFailed: %d",
+		r.Renamed, r.CoversResized, r.Extracted, r.EmbeddedResized, r.Transcoded, r.GenresSet, r.Skipped, r.Failed,
 	)
 	if dryRun {
 		return "Dry-run — no files were modified. Counts show what would change:\n\n" + counts

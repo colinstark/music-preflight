@@ -80,3 +80,55 @@ func TestResizeMP3ArtNoArt(t *testing.T) {
 		t.Error("expected no change for file without art")
 	}
 }
+
+func TestSetMP3Genre(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "track.mp3")
+	writeMP3WithArt(t, path, makeJPEG(t, 200, 200))
+
+	o := DefaultOptions()
+	o.Genre = "Jazz"
+
+	changed, err := setMP3Genre(o, path)
+	if err != nil {
+		t.Fatalf("setMP3Genre: %v", err)
+	}
+	if !changed {
+		t.Fatal("expected genre to be set")
+	}
+	if g, err := readMP3Genre(path); err != nil {
+		t.Fatalf("readMP3Genre: %v", err)
+	} else if g != "Jazz" {
+		t.Errorf("genre = %q, want Jazz", g)
+	}
+
+	// Second pass is a no-op (already that genre).
+	changed, err = setMP3Genre(o, path)
+	if err != nil {
+		t.Fatalf("setMP3Genre second pass: %v", err)
+	}
+	if changed {
+		t.Error("expected no change when genre already set")
+	}
+}
+
+func TestSetMP3GenreDryRun(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "track.mp3")
+	writeMP3WithArt(t, path, makeJPEG(t, 200, 200))
+
+	o := DefaultOptions()
+	o.Genre = "Rock"
+	o.DryRun = true
+
+	changed, err := setMP3Genre(o, path)
+	if err != nil {
+		t.Fatalf("setMP3Genre: %v", err)
+	}
+	if !changed {
+		t.Fatal("dry-run should report intended change")
+	}
+	if g, _ := readMP3Genre(path); g == "Rock" {
+		t.Error("dry-run must not write the tag")
+	}
+}

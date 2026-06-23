@@ -59,6 +59,9 @@ type Options struct {
 
 	Transcode TranscodeMode // optional audio conversion
 
+	SetGenre bool   // set the genre tag on audio files to Genre
+	Genre    string // genre string written when SetGenre is true
+
 	Backup bool // write a <file>.bak copy before mutating a file
 	DryRun bool // report intended actions without changing anything
 }

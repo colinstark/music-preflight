@@ -152,18 +152,32 @@ func TestOptionsBooleansForwarded(t *testing.T) {
 	r := RunRequest{
 		Recursive: true, RenameStrayJPG: true, ResizeCoverJPG: true,
 		ExtractCover: true, ResizeEmbedded: true, Backup: true, DryRun: true,
+		SetGenre: true,
 	}
 	opts, _ := r.Options()
 	if !opts.Recursive || !opts.RenameStrayJPG || !opts.ResizeCoverJPG ||
 		!opts.ExtractCover || !opts.ResizeEmbedded || !opts.Backup || !opts.DryRun {
 		t.Errorf("all booleans should forward true: %+v", opts)
 	}
+	if !opts.SetGenre {
+		t.Error("SetGenre should forward true")
+	}
 
 	r2 := RunRequest{}
 	opts2, _ := r2.Options()
 	if opts2.Recursive || opts2.RenameStrayJPG || opts2.ResizeCoverJPG ||
-		opts2.ExtractCover || opts2.ResizeEmbedded || opts2.Backup || opts2.DryRun {
+		opts2.ExtractCover || opts2.ResizeEmbedded || opts2.Backup || opts2.DryRun ||
+		opts2.SetGenre {
 		t.Errorf("zero-value booleans should forward false: %+v", opts2)
+	}
+}
+
+// --- Options(): genre forwarded ---
+
+func TestOptionsGenreForwarded(t *testing.T) {
+	opts, _ := RunRequest{SetGenre: true, Genre: "Jazz"}.Options()
+	if !opts.SetGenre || opts.Genre != "Jazz" {
+		t.Errorf("SetGenre/Genre = %v/%q, want true/Jazz", opts.SetGenre, opts.Genre)
 	}
 }
 

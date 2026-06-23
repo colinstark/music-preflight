@@ -24,6 +24,8 @@ type RunRequest struct {
 	ExtractCover   bool   `json:"extractCover"`
 	ResizeEmbedded bool   `json:"resizeEmbedded"`
 	Transcode      string `json:"transcode"` // "none" | "mp3-320" | "aac-256"
+	SetGenre       bool   `json:"setGenre"`
+	Genre          string `json:"genre"`
 	Backup         bool   `json:"backup"`
 	DryRun         bool   `json:"dryRun"`
 }
@@ -84,6 +86,8 @@ func (r RunRequest) Options() (core.Options, error) {
 		ExtractCover:   r.ExtractCover,
 		ResizeEmbedded: r.ResizeEmbedded,
 		Transcode:      mode,
+		SetGenre:       r.SetGenre,
+		Genre:          r.Genre,
 		Backup:         r.Backup,
 		DryRun:         r.DryRun,
 	}, nil

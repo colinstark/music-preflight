@@ -4,10 +4,9 @@ import "context"
 
 // Run processes o.Dir according to the enabled passes and returns a Report.
 // progress, if non-nil, receives a live Event for each unit of work; the CLI
-// prints these and the future GUI will render them. Per-file failures are
-// recorded in the Report and do not abort the run; only engine-level failures
-// (a missing scan root, or ffmpeg being unavailable for a requested transcode)
-// return an error.
+// prints these and the GUI renders them. Per-file failures are recorded in the
+// Report and do not abort the run; only engine-level failures (a missing scan
+// root, or ffmpeg being unavailable for a requested transcode) return an error.
 func Run(ctx context.Context, o Options, progress func(Event)) (Report, error) {
 	if progress == nil {
 		progress = func(Event) {}
@@ -49,8 +48,17 @@ func Run(ctx context.Context, o Options, progress func(Event)) (Report, error) {
 			}
 		}
 
-		// Pass 4: transcode audio. Runs after the embedded-art pass so the
-		// (already-resized) cover stream is copied into the new file.
+		// Pass 4: set the genre tag. Runs before transcode so the tag is
+		// carried onto the output by ffmpeg's -map_metadata 0.
+		if o.SetGenre && o.Genre != "" && len(f.audio) > 0 {
+			for _, a := range f.audio {
+				setGenre(o, a, &rep, progress)
+			}
+		}
+
+		// Pass 5: transcode audio. Runs after the embedded-art and genre
+		// passes so the (already-resized) cover and genre carry into the new
+		// file via -map_metadata 0.
 		if o.Transcode != TranscodeNone {
 			for _, a := range f.audio {
 				if err := transcodeFile(ctx, o, a, &rep, progress); err != nil {
@@ -72,6 +80,8 @@ func folderHasWork(o Options, f *albumFolder) bool {
 	case o.ExtractCover && !f.hasCover && len(f.audio) > 0:
 		return true
 	case o.ResizeEmbedded && len(f.audio) > 0:
+		return true
+	case o.SetGenre && o.Genre != "" && len(f.audio) > 0:
 		return true
 	case o.Transcode != TranscodeNone && len(f.audio) > 0:
 		return true

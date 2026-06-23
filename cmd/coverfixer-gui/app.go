@@ -9,6 +9,7 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"github.com/colinstark/coverfixer/internal/core"
 	"github.com/colinstark/coverfixer/internal/ui"
 )
 
@@ -69,6 +70,16 @@ func (a *App) OpenFolder() string {
 		return ""
 	}
 	return dir
+}
+
+// ReadFirstGenre returns the genre tag of the first audio file under dir, or ""
+// if there is no audio. Used to prefill the GUI's genre field once a folder is
+// picked.
+func (a *App) ReadFirstGenre(dir string) string {
+	if dir == "" {
+		return ""
+	}
+	return core.ReadFirstGenre(dir)
 }
 
 // wailsEmitter adapts ui.Emitter to Wails' runtime.EventsEmit. It is the only

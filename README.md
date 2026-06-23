@@ -7,6 +7,7 @@
 - Generate `cover.jpg` in an album folder from embedded art when one is missing.
 - Resize an existing `cover.jpg` (and rename a stray `*.jpg` to `cover.jpg`).
 - Optionally **transcode** audio to `mp3-320` or `aac-256`.
+- Optionally **set the genre tag** on every audio file to a single value.
 
 All artwork work is **pure Go** (no external dependencies). `ffmpeg` is used **only**
 for transcoding, so artwork-only runs never touch it.
@@ -46,6 +47,7 @@ make build                                   # builds ./coverfixer (uses system 
 | `--extract-cover`    | `true`  | Write `cover.jpg` from embedded art when missing.           |
 | `--resize-embedded`  | `false` | Resize artwork embedded inside audio files, in place.        |
 | `--transcode`        | `none`  | Audio conversion: `none` \| `mp3-320` \| `aac-256`.          |
+| `--genre`            | _(off)_ | Set the genre tag on every audio file to this value (empty = off). |
 | `--backup`           | `false` | Write a `<file>.bak` copy before modifying a file.          |
 | `--dry-run`          | `false` | Report intended actions without changing anything.          |
 | `--no-recursive`     | `false` | Do not descend into subfolders.                             |

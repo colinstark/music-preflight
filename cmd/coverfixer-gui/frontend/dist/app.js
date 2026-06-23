@@ -11,6 +11,7 @@ const INPUT_IDS = [
     "dryRun", "recursive", "renameStrayJpg", "resizeCoverJpg",
     "extractCover", "resizeEmbedded", "backup",
     "artSize", "jpegQuality", "transcode",
+    "setGenre", "genre",
 ];
 
 function intOf(s) {
@@ -47,6 +48,9 @@ function applyRequest(req) {
     $("backup").checked = !!req.backup;
     $("dryRun").checked = !!req.dryRun;
     $("transcode").value = req.transcode || "none";
+    $("setGenre").checked = !!req.setGenre;
+    // Don't overwrite a folder-prefilled genre with the empty default.
+    if (!$("genre").value) $("genre").value = req.genre || "";
     updateRunEnabled();
 }
 
@@ -61,6 +65,8 @@ function collectRequest() {
         extractCover: $("extractCover").checked,
         resizeEmbedded: $("resizeEmbedded").checked,
         transcode: $("transcode").value,
+        setGenre: $("setGenre").checked,
+        genre: $("genre").value,
         backup: $("backup").checked,
         dryRun: $("dryRun").checked,
     };
@@ -83,6 +89,12 @@ async function onChooseFolder() {
     if (dir) {
         $("dir").value = dir;
         $("pathLabel").textContent = dir;
+        // Prefill the genre field from the first audio file's existing tag.
+        try {
+            $("genre").value = await App().ReadFirstGenre(dir);
+        } catch (err) {
+            console.error(err);
+        }
         updateRunEnabled();
     }
 }

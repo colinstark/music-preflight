@@ -24,6 +24,7 @@ func main() {
 	flag.BoolVar(&o.ExtractCover, "extract-cover", o.ExtractCover, "write cover.jpg from embedded art when missing")
 	flag.BoolVar(&o.ResizeEmbedded, "resize-embedded", o.ResizeEmbedded, "resize artwork embedded inside audio files, in place")
 	transcode := flag.String("transcode", "none", "audio conversion: none|mp3-320|aac-256")
+	genre := flag.String("genre", "", "set the genre tag on every audio file to this value (empty = off)")
 	flag.BoolVar(&o.Backup, "backup", o.Backup, "write a <file>.bak copy before modifying a file")
 	flag.BoolVar(&o.DryRun, "dry-run", o.DryRun, "report intended actions without changing anything")
 	noRecursive := flag.Bool("no-recursive", false, "do not descend into subfolders")
@@ -45,6 +46,10 @@ func main() {
 	o.Transcode = mode
 	o.Recursive = !*noRecursive
 	o.Dir = dir
+	if *genre != "" {
+		o.SetGenre = true
+		o.Genre = *genre
+	}
 
 	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
 		fmt.Fprintf(os.Stderr, "coverfixer: %q is not a directory\n", dir)
@@ -109,6 +114,7 @@ func printSummary(r core.Report, dryRun bool) {
 	fmt.Printf("  Extracted        : %d\n", r.Extracted)
 	fmt.Printf("  Embedded resized : %d\n", r.EmbeddedResized)
 	fmt.Printf("  Transcoded       : %d\n", r.Transcoded)
+	fmt.Printf("  Genres set       : %d\n", r.GenresSet)
 	fmt.Printf("  Skipped          : %d\n", r.Skipped)
 	if r.Failed > 0 {
 		fmt.Printf("  Failed           : %d\n", r.Failed)

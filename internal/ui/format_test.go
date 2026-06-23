@@ -100,7 +100,7 @@ func TestFormatEventDistinctKinds(t *testing.T) {
 }
 
 func TestFormatReportAllCounters(t *testing.T) {
-	r := core.Report{Renamed: 1, CoversResized: 2, Extracted: 3, EmbeddedResized: 4, Transcoded: 5, Skipped: 6, Failed: 7}
+	r := core.Report{Renamed: 1, CoversResized: 2, Extracted: 3, EmbeddedResized: 4, Transcoded: 5, GenresSet: 6, Skipped: 7, Failed: 8}
 	got := formatReport(r, false)
 	expected := []string{
 		"Renamed: 1",
@@ -108,8 +108,9 @@ func TestFormatReportAllCounters(t *testing.T) {
 		"Extracted: 3",
 		"Embedded Resized: 4",
 		"Transcoded: 5",
-		"Skipped: 6",
-		"Failed: 7",
+		"Genres Set: 6",
+		"Skipped: 7",
+		"Failed: 8",
 	}
 	for _, exp := range expected {
 		if !strings.Contains(got, exp) {
@@ -127,6 +128,7 @@ func TestFormatReportZero(t *testing.T) {
 		"Extracted: 0",
 		"Embedded Resized: 0",
 		"Transcoded: 0",
+		"Genres Set: 0",
 		"Skipped: 0",
 		"Failed: 0",
 	}

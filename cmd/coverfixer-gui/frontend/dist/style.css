@@ -106,6 +106,31 @@ hr {
     gap: 10px;
 }
 
+.genre-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.genre-row input[type="text"] {
+    background: var(--bg-input);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 5px 8px;
+    flex: 1;
+    font-size: 14px;
+}
+
+.check-inline {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
 .btn {
     background: var(--bg-panel);
     color: var(--text);

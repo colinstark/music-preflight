@@ -98,3 +98,46 @@ func TestReadM4AArtHeadless(t *testing.T) {
 		t.Errorf("cover %dx%d, want 600x600", w, h)
 	}
 }
+
+// TestSetM4AGenreHeadless exercises the pure-Go ©gen write path headlessly.
+func TestSetM4AGenreHeadless(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "track.m4a")
+	writeM4AFixture(t, path)
+
+	if g, _ := readM4AGenre(path); g != "" {
+		t.Fatalf("fixture genre = %q, want empty", g)
+	}
+
+	o := DefaultOptions()
+	o.Genre = "Ambient"
+
+	changed, err := setM4AGenre(o, path)
+	if err != nil {
+		t.Fatalf("setM4AGenre: %v", err)
+	}
+	if !changed {
+		t.Fatal("expected genre to be set")
+	}
+	if g, _ := readM4AGenre(path); g != "Ambient" {
+		t.Errorf("genre = %q, want Ambient", g)
+	}
+
+	// The cover must still be intact after the ©gen rewrite.
+	art, err := readM4AArt(path)
+	if err != nil {
+		t.Fatalf("readM4AArt after genre set: %v", err)
+	}
+	if art == nil {
+		t.Fatal("cover lost after genre write")
+	}
+
+	// Second pass is a no-op (already that genre).
+	changed, err = setM4AGenre(o, path)
+	if err != nil {
+		t.Fatalf("setM4AGenre second pass: %v", err)
+	}
+	if changed {
+		t.Error("expected no change when genre already set")
+	}
+}

@@ -6,6 +6,52 @@ import (
 	mp4tag "github.com/Sorrow446/go-mp4tag"
 )
 
+// readM4AGenre returns the file's free-text genre (the ©gen atom), or "" if unset.
+func readM4AGenre(path string) (string, error) {
+	mp4, err := mp4tag.Open(path)
+	if err != nil {
+		return "", fmt.Errorf("open mp4: %w", err)
+	}
+	defer mp4.Close()
+
+	tags, err := mp4.Read()
+	if err != nil {
+		return "", fmt.Errorf("read mp4 tags: %w", err)
+	}
+	return tags.CustomGenre, nil
+}
+
+// setM4AGenre writes o.Genre into the ©gen atom in place, preserving the file's
+// other tags. It returns whether the tag was changed.
+func setM4AGenre(o Options, path string) (bool, error) {
+	mp4, err := mp4tag.Open(path)
+	if err != nil {
+		return false, fmt.Errorf("open mp4: %w", err)
+	}
+	defer mp4.Close()
+
+	tags, err := mp4.Read()
+	if err != nil {
+		return false, fmt.Errorf("read mp4 tags: %w", err)
+	}
+	if tags.CustomGenre == o.Genre {
+		return false, nil
+	}
+	if o.DryRun {
+		return true, nil
+	}
+
+	if err := maybeBackup(o, path); err != nil {
+		return false, err
+	}
+	// "customgenre" clears the existing ©gen so we replace rather than append;
+	// other tags are left untouched (merged).
+	if err := mp4.Write(&mp4tag.MP4Tags{CustomGenre: o.Genre}, []string{"customgenre"}); err != nil {
+		return false, fmt.Errorf("write mp4 tags: %w", err)
+	}
+	return true, nil
+}
+
 // readM4AArt returns the bytes of the first embedded cover (covr) picture, or
 // nil if the file has no embedded artwork.
 func readM4AArt(path string) ([]byte, error) {
