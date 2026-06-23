@@ -4,24 +4,25 @@ import "context"
 
 // Run processes o.Dir according to the enabled passes and returns a Report.
 // progress, if non-nil, receives a live Event for each unit of work; the CLI
-// prints these and the GUI renders them. Per-file failures are recorded in the
-// Report and do not abort the run; only engine-level failures (a missing scan
-// root, or ffmpeg being unavailable for a requested transcode) return an error.
+// prints these and the future GUI will render them. Per-file failures are
+// recorded in the Report and do not abort the run; only engine-level failures
+// (a missing scan root, or ffmpeg being unavailable for a requested transcode)
+// return an error.
 func Run(ctx context.Context, o Options, progress func(Event)) (Report, error) {
 	if progress == nil {
 		progress = func(Event) {}
 	}
 	o.applyDefaults()
 
-	var rep Report
+	var rep reportAccum
 	folders, err := scan(o.Dir, o.Recursive, &rep, progress)
 	if err != nil {
-		return rep, err
+		return rep.Report, err
 	}
 
 	for _, f := range folders {
 		if err := ctx.Err(); err != nil {
-			return rep, err
+			return rep.Report, err
 		}
 
 		// Announce the folder once, before its passes run, so front-ends can
@@ -43,31 +44,38 @@ func Run(ctx context.Context, o Options, progress func(Event)) (Report, error) {
 
 		// Pass 3: resize artwork embedded in audio files, in place.
 		if o.ResizeEmbedded {
-			for _, a := range f.audio {
+			if err := forEachParallel(ctx, f.audio, func(_ context.Context, a string) error {
 				resizeEmbedded(o, a, &rep, progress)
+				return nil
+			}); err != nil {
+				return rep.Report, err
 			}
 		}
 
 		// Pass 4: set the genre tag. Runs before transcode so the tag is
 		// carried onto the output by ffmpeg's -map_metadata 0.
 		if o.SetGenre && o.Genre != "" && len(f.audio) > 0 {
-			for _, a := range f.audio {
+			if err := forEachParallel(ctx, f.audio, func(_ context.Context, a string) error {
 				setGenre(o, a, &rep, progress)
+				return nil
+			}); err != nil {
+				return rep.Report, err
 			}
 		}
 
 		// Pass 5: transcode audio. Runs after the embedded-art and genre
 		// passes so the (already-resized) cover and genre carry into the new
-		// file via -map_metadata 0.
+		// file via -map_metadata 0. Each transcode is an independent ffmpeg
+		// subprocess, so this pass benefits most from the worker pool.
 		if o.Transcode != TranscodeNone {
-			for _, a := range f.audio {
-				if err := transcodeFile(ctx, o, a, &rep, progress); err != nil {
-					return rep, err
-				}
+			if err := forEachParallel(ctx, f.audio, func(ctx context.Context, a string) error {
+				return transcodeFile(ctx, o, a, &rep, progress)
+			}); err != nil {
+				return rep.Report, err
 			}
 		}
 	}
-	return rep, nil
+	return rep.Report, nil
 }
 
 // folderHasWork reports whether any enabled pass will act on f, mirroring the
@@ -90,7 +98,7 @@ func folderHasWork(o Options, f *albumFolder) bool {
 	}
 }
 
-func resizeEmbedded(o Options, path string, rep *Report, progress func(Event)) {
+func resizeEmbedded(o Options, path string, rep *reportAccum, progress func(Event)) {
 	var (
 		changed bool
 		err     error
@@ -109,6 +117,6 @@ func resizeEmbedded(o Options, path string, rep *Report, progress func(Event)) {
 	}
 	if changed {
 		rep.action(progress, "resize-embedded", path, "")
-		rep.EmbeddedResized++
+		rep.inc(&rep.EmbeddedResized)
 	}
 }

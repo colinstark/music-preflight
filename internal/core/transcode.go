@@ -16,7 +16,7 @@ import (
 // is replaced; with o.Backup a <file>.bak copy is kept first. A returned error
 // is engine-level (ffmpeg unavailable) and aborts the run; per-file conversion
 // failures are recorded in the Report and return nil.
-func transcodeFile(ctx context.Context, o Options, path string, rep *Report, progress func(Event)) error {
+func transcodeFile(ctx context.Context, o Options, path string, rep *reportAccum, progress func(Event)) error {
 	var (
 		targetExt string
 		audioArgs []string
@@ -36,7 +36,7 @@ func transcodeFile(ctx context.Context, o Options, path string, rep *Report, pro
 
 	rep.action(progress, "transcode", path, "→ "+o.Transcode.String())
 	if o.DryRun {
-		rep.Transcoded++
+		rep.inc(&rep.Transcoded)
 		return nil
 	}
 
@@ -102,7 +102,7 @@ func transcodeFile(ctx context.Context, o Options, path string, rep *Report, pro
 		return nil
 	}
 
-	rep.Transcoded++
+	rep.inc(&rep.Transcoded)
 	return nil
 }
 

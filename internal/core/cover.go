@@ -21,7 +21,7 @@ func readEmbeddedArt(path string) ([]byte, error) {
 
 // processJPGs renames a stray *.jpg to cover.jpg (when the folder has none) and
 // resizes cover.jpg to the target baseline JPEG.
-func processJPGs(o Options, f *albumFolder, rep *Report, progress func(Event)) {
+func processJPGs(o Options, f *albumFolder, rep *reportAccum, progress func(Event)) {
 	hasCover := f.hasCover
 	for _, jpg := range f.jpgs {
 		cur := jpg
@@ -36,7 +36,7 @@ func processJPGs(o Options, f *albumFolder, rep *Report, progress func(Event)) {
 					continue
 				}
 			}
-			rep.Renamed++
+			rep.inc(&rep.Renamed)
 			cur = dst
 			hasCover = true
 			f.hasCover = true // propagate so the extract pass doesn't overwrite the renamed cover
@@ -49,12 +49,12 @@ func processJPGs(o Options, f *albumFolder, rep *Report, progress func(Event)) {
 	}
 }
 
-func resizeCoverFile(o Options, path string, rep *Report, progress func(Event)) {
+func resizeCoverFile(o Options, path string, rep *reportAccum, progress func(Event)) {
 	if !fileExists(path) {
 		// Reachable only under DryRun after a simulated rename; count the
 		// resize we would perform on the renamed cover.
 		rep.action(progress, "resize-cover", path, "(after rename)")
-		rep.CoversResized++
+		rep.inc(&rep.CoversResized)
 		return
 	}
 
@@ -89,12 +89,12 @@ func resizeCoverFile(o Options, path string, rep *Report, progress func(Event)) 
 			return
 		}
 	}
-	rep.CoversResized++
+	rep.inc(&rep.CoversResized)
 }
 
 // extractCover writes cover.jpg into a folder from the first audio file that
 // carries embedded artwork.
-func extractCover(o Options, f *albumFolder, rep *Report, progress func(Event)) {
+func extractCover(o Options, f *albumFolder, rep *reportAccum, progress func(Event)) {
 	dst := coverPath(f.dir)
 	for _, a := range f.audio {
 		art, err := readEmbeddedArt(a)
@@ -117,7 +117,7 @@ func extractCover(o Options, f *albumFolder, rep *Report, progress func(Event)) 
 				return
 			}
 		}
-		rep.Extracted++
+		rep.inc(&rep.Extracted)
 		f.hasCover = true
 		return
 	}

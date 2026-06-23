@@ -43,7 +43,7 @@ func classifyAudio(path string) audioKind {
 // An unreadable root is returned as an error (engine-level). An unreadable
 // subdirectory or file is recorded as a per-entry failure via rep/progress and
 // skipped, so one locked folder does not abort the whole run.
-func scan(root string, recursive bool, rep *Report, progress func(Event)) ([]*albumFolder, error) {
+func scan(root string, recursive bool, rep *reportAccum, progress func(Event)) ([]*albumFolder, error) {
 	folders := map[string]*albumFolder{}
 	get := func(dir string) *albumFolder {
 		f := folders[dir]

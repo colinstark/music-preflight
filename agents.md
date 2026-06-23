@@ -41,6 +41,22 @@ When adding behaviour, put logic in `internal/core` and surface it as an
 - **ffmpeg** is used **only** for transcoding (`transcode.go`). Artwork-only runs
   never touch it.
 
+### Concurrency
+The per-file passes — embedded-art resize (`runner.go`), genre set (`genre.go`),
+and transcode (`transcode.go`) — run concurrently within each folder over a
+bounded worker pool sized to `GOMAXPROCS` (`forEachParallel` in `parallel.go`).
+Implications when changing the engine:
+- **Progress events arrive in non-deterministic order** under these passes
+  (front-ends must not assume per-file ordering).
+- **`Report` counters are guarded**: mutate them only via `rep.inc(&rep.Field)`
+  or the `rep.skip`/`rep.fail` helpers — never `rep.Field++`. The guard lives on
+  the internal `reportAccum` (the public `Report` returned by `Run` is a plain,
+  lock-free snapshot).
+- Per-file temp paths embed the full file path, so they are unique across files
+  in the same folder and safe under concurrency.
+- An engine-level error from a worker (e.g. ffmpeg unavailable) cancels the pool
+  and aborts the run, matching the pre-concurrency transcode semantics.
+
 ## ffmpeg delivery
 
 ffmpeg is resolved lazily by `internal/ffmpeg` in two build variants:

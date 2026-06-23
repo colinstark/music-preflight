@@ -25,7 +25,7 @@ func readGenre(path string) (string, error) {
 
 // setGenre writes o.Genre into an audio file's tag in place (format-dispatched),
 // recording the outcome on rep. Unsupported formats are a no-op.
-func setGenre(o Options, path string, rep *Report, progress func(Event)) {
+func setGenre(o Options, path string, rep *reportAccum, progress func(Event)) {
 	var (
 		changed bool
 		err     error
@@ -44,7 +44,7 @@ func setGenre(o Options, path string, rep *Report, progress func(Event)) {
 	}
 	if changed {
 		rep.action(progress, "set-genre", path, o.Genre)
-		rep.GenresSet++
+		rep.inc(&rep.GenresSet)
 	}
 }
 

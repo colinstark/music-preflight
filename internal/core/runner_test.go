@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -292,5 +293,48 @@ func TestReadFirstGenre(t *testing.T) {
 	}
 	if g := ReadFirstGenre(filepath.Join(root, "no-such-dir")); g != "" {
 		t.Errorf("ReadFirstGenre on missing dir = %q, want empty", g)
+	}
+}
+
+// TestRunParallelEmbeddedResize processes many files through the concurrent
+// embedded-resize pass and confirms counters stay correct under contention and
+// every file is left correctly sized. It doubles as a race-detector stress
+// test for the guarded Report accumulator.
+func TestRunParallelEmbeddedResize(t *testing.T) {
+	root := t.TempDir()
+	album := filepath.Join(root, "Album")
+	if err := os.MkdirAll(album, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	const n = 25 // > GOMAXPROCS on most machines, to exercise pool batching
+	for i := 0; i < n; i++ {
+		writeMP3WithArt(t, filepath.Join(album, fmt.Sprintf("%02d.mp3", i+1)), makeJPEG(t, 1500, 1500))
+	}
+
+	o := DefaultOptions()
+	o.Dir = root
+	o.RenameStrayJPG = false
+	o.ResizeCoverJPG = false
+	o.ExtractCover = false
+	o.ResizeEmbedded = true
+
+	rep, err := Run(context.Background(), o, nil)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if rep.Failed != 0 {
+		t.Fatalf("Failed = %d, want 0", rep.Failed)
+	}
+	if rep.EmbeddedResized != n {
+		t.Errorf("EmbeddedResized = %d, want %d", rep.EmbeddedResized, n)
+	}
+	for i := 0; i < n; i++ {
+		art, err := readMP3Art(filepath.Join(album, fmt.Sprintf("%02d.mp3", i+1)))
+		if err != nil {
+			t.Fatalf("read art %d: %v", i+1, err)
+		}
+		if w, h := jpegDimensions(t, art); w > 500 || h > 500 {
+			t.Errorf("track %02d art %dx%d, want <= 500", i+1, w, h)
+		}
 	}
 }
