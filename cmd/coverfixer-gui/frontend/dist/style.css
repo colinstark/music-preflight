@@ -1,18 +1,61 @@
+/* Coverfixer — macOS-native styling.
+   Light/dark via prefers-color-scheme; body is transparent so the macOS
+   vibrancy material (enabled in main.go) shows through. Text selection is
+   disabled globally and re-enabled only on real inputs and the output areas. */
+
 :root {
-    --bg: #181a1e;
-    --bg-panel: #21242b;
-    --bg-input: #15171c;
-    --border: #353945;
-    --text: #e6e7eb;
-    --text-dim: #9aa0aa;
-    --accent: #3b82f6;
-    --accent-hover: #2f6fde;
-    --danger: #ef4444;
-    --danger-bg: #2a1717;
-    --ok: #22c55e;
-    --radius: 6px;
+    /* Dark palette (default). Tuned to macOS dark system materials. */
+    --text: #f5f5f7;
+    --text-dim: #98989d;
+    --text-faint: #6d6e73;
+
+    --panel: rgba(255, 255, 255, 0.055);
+    --panel-inset: rgba(0, 0, 0, 0.22);
+    --panel-hover: rgba(255, 255, 255, 0.085);
+
+    --field-bg: rgba(0, 0, 0, 0.28);
+    --hairline: rgba(255, 255, 255, 0.09);
+    --hairline-strong: rgba(255, 255, 255, 0.16);
+
+    --accent: #0a84ff;
+    --accent-hover: #409cff;
+    --accent-pressed: #0064e0;
+    --danger: #ff453a;
+    --danger-bg: rgba(255, 69, 58, 0.14);
+    --ok: #30d158;
+
+    --focus-ring: rgba(10, 132, 255, 0.42);
+
+    --radius: 10px;
+    --radius-field: 6px;
+
     --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+@media (prefers-color-scheme: light) {
+    :root {
+        --text: #1d1d1f;
+        --text-dim: #6e6e73;
+        --text-faint: #9a9a9e;
+
+        --panel: rgba(255, 255, 255, 0.55);
+        --panel-inset: rgba(0, 0, 0, 0.04);
+        --panel-hover: rgba(0, 0, 0, 0.05);
+
+        --field-bg: #ffffff;
+        --hairline: rgba(0, 0, 0, 0.09);
+        --hairline-strong: rgba(0, 0, 0, 0.16);
+
+        --accent: #007aff;
+        --accent-hover: #2f96ff;
+        --accent-pressed: #0057d8;
+        --danger: #d70015;
+        --danger-bg: rgba(215, 0, 21, 0.08);
+        --ok: #1a7f37;
+
+        --focus-ring: rgba(0, 122, 255, 0.35);
+    }
 }
 
 * { box-sizing: border-box; }
@@ -20,26 +63,55 @@
 html, body {
     margin: 0;
     height: 100%;
-    background: var(--bg);
+    background: transparent;
     color: var(--text);
     font-family: var(--sans);
-    font-size: 14px;
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+/* Selection policy: nothing is selectable by default. */
+body {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-user-drag: none;
+}
+
+/* …except real text inputs and the output/log areas, which stay copyable. */
+input, textarea, select,
+.log, .summary-text, .error-text {
+    user-select: text;
+    -webkit-user-select: text;
 }
 
 .app {
-    padding: 16px 18px;
+    /* Top padding clears the traffic lights under the transparent titlebar. */
+    padding: 38px 18px 16px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 14px;
     min-height: 100%;
 }
 
-hr {
-    width: 100%;
-    border: none;
-    border-top: 1px solid var(--border);
-    margin: 2px 0;
+/* Window drag handles. With the transparent titlebar there is no native drag
+   region, so we designate one via Wails' --wails-draggable flag: the app
+   background (window padding + inter-section gaps) and the toolbar act as drag
+   handles. Custom properties inherit, so every element holding interactive or
+   text content explicitly opts out (--wails-draggable: none) to stay clickable. */
+.app,
+.folder-row,
+.path {
+    --wails-draggable: drag;
 }
+.btn, input, select, textarea, label,
+.panel, .field, .fields, .checks, .check-inline, .genre-row,
+.actions, .progress, .summary, .panel-header,
+.log, .summary-text, .error-text {
+    --wails-draggable: none;
+}
+
+/* ---------- Toolbar / folder row ---------- */
 
 .folder-row {
     display: flex;
@@ -53,6 +125,27 @@ hr {
     text-overflow: ellipsis;
     white-space: nowrap;
     flex: 1;
+    font-size: 12px;
+}
+
+/* ---------- Grouped panels (System Settings style) ---------- */
+
+.panel {
+    background: var(--panel);
+    border: 0.5px solid var(--hairline);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    backdrop-filter: saturate(150%);
+    -webkit-backdrop-filter: saturate(150%);
+}
+
+.panel-header {
+    color: var(--text-dim);
+    font-size: 11px;
+    font-weight: 600;
+    margin: 0 2px 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
 }
 
 .options {
@@ -67,125 +160,127 @@ hr {
     gap: 6px 14px;
 }
 
-.checks label {
+.checks label,
+.check-inline {
     display: flex;
     align-items: center;
     gap: 7px;
     cursor: pointer;
-    user-select: none;
 }
 
 .fields {
     display: flex;
-    gap: 16px;
+    gap: 14px;
     flex-wrap: wrap;
+    margin-top: 4px;
 }
 
 .field {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text-dim);
 }
 
 .field input,
 .field select,
 #transcode {
-    background: var(--bg-input);
+    background: var(--field-bg);
     color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 5px 8px;
-    width: 120px;
-    font-size: 14px;
-}
-
-.actions {
-    display: flex;
-    gap: 10px;
+    border: 0.5px solid var(--hairline-strong);
+    border-radius: var(--radius-field);
+    padding: 4px 8px;
+    width: 128px;
+    font-size: 13px;
 }
 
 .genre-row {
     display: flex;
     align-items: center;
     gap: 10px;
+    margin-top: 4px;
 }
 
 .genre-row input[type="text"] {
-    background: var(--bg-input);
+    background: var(--field-bg);
     color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 5px 8px;
+    border: 0.5px solid var(--hairline-strong);
+    border-radius: var(--radius-field);
+    padding: 4px 8px;
     flex: 1;
-    font-size: 14px;
+    font-size: 13px;
 }
 
-.check-inline {
+/* Native macOS-accented checkboxes / selects / ranges. */
+input[type="checkbox"],
+input[type="number"],
+input[type="text"],
+select {
+    accent-color: var(--accent);
+}
+
+/* Focus ring for fields. */
+.field input:focus,
+.field select:focus,
+.genre-row input[type="text"]:focus,
+#transcode:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+/* ---------- Actions ---------- */
+
+.actions {
     display: flex;
-    align-items: center;
-    gap: 7px;
-    cursor: pointer;
-    user-select: none;
-    white-space: nowrap;
+    gap: 10px;
+    justify-content: flex-end;
 }
 
 .btn {
-    background: var(--bg-panel);
+    background: var(--panel);
     color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 7px 16px;
-    font-size: 14px;
+    border: 0.5px solid var(--hairline-strong);
+    border-radius: var(--radius-field);
+    padding: 6px 16px;
+    min-width: 84px;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1;
     cursor: pointer;
+    transition: background-color 0.12s ease, transform 0.05s ease;
 }
 
 .btn:hover:not(:disabled) {
-    border-color: #4a4f5e;
+    background: var(--panel-hover);
+}
+
+.btn:active:not(:disabled) {
+    transform: scale(0.985);
 }
 
 .btn-primary {
     background: var(--accent);
-    border-color: var(--accent);
+    border-color: transparent;
     color: #fff;
     font-weight: 600;
 }
 
 .btn-primary:hover:not(:disabled) {
     background: var(--accent-hover);
-    border-color: var(--accent-hover);
+}
+
+.btn-primary:active:not(:disabled) {
+    background: var(--accent-pressed);
 }
 
 .btn:disabled {
-    opacity: 0.45;
+    opacity: 0.4;
     cursor: not-allowed;
 }
 
-.section-label {
-    display: block;
-    color: var(--text-dim);
-    font-size: 12px;
-    margin-bottom: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-.log {
-    background: var(--bg-input);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    margin: 0;
-    padding: 8px 10px;
-    font-family: var(--mono);
-    font-size: 12.5px;
-    line-height: 1.5;
-    color: var(--text-dim);
-    height: 180px;
-    overflow: auto;
-    white-space: pre-wrap;
-    word-break: break-all;
-}
+/* ---------- Output ---------- */
 
 .progress {
     display: flex;
@@ -194,27 +289,62 @@ hr {
     min-height: 0;
 }
 
+.log {
+    background: var(--panel-inset);
+    border: 0.5px solid var(--hairline);
+    border-radius: var(--radius);
+    margin: 0;
+    padding: 8px 10px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-dim);
+    height: 180px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
 .progress .log {
     flex: 1;
+}
+
+.summary {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
 .summary-text {
     margin: 0;
     font-family: var(--mono);
-    font-size: 13px;
+    font-size: 12.5px;
     white-space: pre-wrap;
     color: var(--ok);
 }
 
 .error-text {
-    margin: 6px 0 0;
+    margin: 0;
     font-family: var(--mono);
-    font-size: 13px;
+    font-size: 12.5px;
     white-space: pre-wrap;
     color: var(--danger);
     background: var(--danger-bg);
-    border-radius: var(--radius);
+    border-radius: var(--radius-field);
     padding: 8px 10px;
 }
 
 .error-text:empty { display: none; }
+
+/* ---------- Thin macOS overlay scrollbars ---------- */
+
+.log::-webkit-scrollbar { width: 9px; height: 9px; }
+.log::-webkit-scrollbar-track { background: transparent; }
+.log::-webkit-scrollbar-thumb {
+    background: var(--hairline-strong);
+    border-radius: 6px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+.log::-webkit-scrollbar-thumb:hover { background: var(--text-faint); background-clip: padding-box; }
+.log::-webkit-scrollbar-corner { background: transparent; }

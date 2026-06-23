@@ -14,9 +14,7 @@
     </section>
     <input type="hidden" id="dir" />
 
-    <hr />
-
-    <section class="options">
+    <section class="panel options" aria-label="Options">
         <div class="checks">
             <label><input type="checkbox" id="dryRun" /> Dry-run</label>
             <label><input type="checkbox" id="recursive" /> Recursive</label>
@@ -50,22 +48,17 @@
         </div>
     </section>
 
-    <hr />
-
     <section class="actions">
-        <button id="runBtn" class="btn btn-primary" type="button" disabled>Run</button>
         <button id="cancelBtn" class="btn" type="button" disabled>Cancel</button>
+        <button id="runBtn" class="btn btn-primary" type="button" disabled>Run</button>
     </section>
 
-    <hr />
-
-    <section class="progress">
-        <label for="log" class="section-label">Progress</label>
+    <section class="progress" aria-label="Progress">
+        <label for="log" class="panel-header">Progress</label>
         <pre id="log" class="log" aria-live="polite"></pre>
     </section>
 
     <section class="summary">
-        <span class="section-label">Summary</span>
         <pre id="summary" class="summary-text"></pre>
         <pre id="error" class="error-text" role="alert"></pre>
     </section>
