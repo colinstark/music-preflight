@@ -84,11 +84,13 @@ make build-gui                                             # → cmd/coverfixer-
 make gui-dev                                               # live-reload dev session
 ```
 
-The frontend is served from committed static files in
-`cmd/coverfixer-gui/frontend/dist/` — there is **no bundler or node build step**
-for the GUI; `make check` (Go fmt/vet/lint/test) needs neither node nor the
-Wails CLI. The Wails CLI is only required for `gui-dev`, `build-gui`, and
-`release-gui`.
+The GUI frontend is **Svelte 5 + Vite** (bun-managed), built from
+`cmd/coverfixer-gui/frontend/src/` into the committed
+`cmd/coverfixer-gui/frontend/dist/` bundle that Wails embeds. `make check`
+(Go fmt/vet/lint/test) needs neither bun nor the Wails CLI — the built bundle
+is checked in. The Wails CLI and bun are only required for `gui-dev`,
+`build-gui`, `release-gui`, and `make gui-frontend` (the standalone bundle
+rebuild).
 
 Wails v2 renders via the OS webview, so **CGO is not required** on macOS
 (WKWebView) or Windows (WebView2). Building the GUI still needs the platform

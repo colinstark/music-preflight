@@ -7,7 +7,7 @@ FFMPEG_DIR  := internal/ffmpeg/bin
 GOOS        := $(shell go env GOOS)
 GOARCH      := $(shell go env GOARCH)
 
-.PHONY: check fmt fmt-check vet lint test build run release fetch-ffmpeg clean gui-dev build-gui release-gui
+.PHONY: check fmt fmt-check vet lint test build run release fetch-ffmpeg clean gui-dev gui-frontend build-gui release-gui
 
 ## check: the project gate — formatting, vet, lint, and tests must all pass.
 check: fmt-check vet lint test
@@ -56,11 +56,19 @@ fetch-ffmpeg:
 	@mkdir -p $(FFMPEG_DIR)
 	@./scripts/fetch-ffmpeg.sh $(GOOS) $(GOARCH) $(FFMPEG_DIR)
 
-## gui-dev: run the Wails GUI with live reload. Requires the `wails` CLI (go install github.com/wailsapp/wails/v2/cmd/wails@latest).
+## gui-frontend: rebuild the committed GUI bundle (frontend/dist) with bun.
+## Requires bun (https://bun.sh). No wails CLI needed. Run this after editing
+## the Svelte sources so the embedded assets are up to date.
+gui-frontend:
+	cd $(GUI_DIR)/frontend && bun install && bun run build
+
+## gui-dev: run the Wails GUI with live reload. Requires the `wails` CLI
+## (go install github.com/wailsapp/wails/v2/cmd/wails@latest) and bun.
 gui-dev:
 	cd $(GUI_DIR) && wails dev
 
-## build-gui: build the GUI app (uses system ffmpeg for transcode). Requires the `wails` CLI.
+## build-gui: build the GUI app (uses system ffmpeg for transcode). Requires
+## the `wails` CLI and bun.
 build-gui:
 	cd $(GUI_DIR) && wails build
 

@@ -1,0 +1,152 @@
+/* Tokens + globals only. Component styles live in each .svelte file. */
+:root {
+    --text: #f5f5f7;
+    --text-dim: #98989d;
+    --text-faint: #6d6e73;
+
+    --panel: rgba(255, 255, 255, 0.055);
+    --panel-inset: rgba(0, 0, 0, 0.22);
+    --panel-hover: rgba(255, 255, 255, 0.085);
+
+    --field-bg: rgba(0, 0, 0, 0.28);
+    --hairline: rgba(255, 255, 255, 0.09);
+    --hairline-strong: rgba(255, 255, 255, 0.16);
+    --folder-bar-bg: rgba(0, 0, 0, 0.15);
+
+    --accent: #0a84ff;
+    --accent-hover: #409cff;
+    --accent-pressed: #0064e0;
+    --accent-tint: rgba(10, 132, 255, 0.18);
+    --danger: #ff453a;
+    --danger-bg: rgba(255, 69, 58, 0.14);
+    --ok: #30d158;
+    --switch-off: rgba(255, 255, 255, 0.1);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
+    --tab-active: rgba(255, 255, 255, 0.12);
+    --tab-border: rgba(255, 255, 255, 0.14);
+    --titlebar-bg: rgba(0, 0, 0, 0.22);
+    --titlebar-fg: #ffffff;
+
+    --focus-ring: rgba(10, 132, 255, 0.42);
+
+    --radius: 10px;
+    --radius-field: 6px;
+
+    --modal-bg: #2b2b2d;
+
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+@media (prefers-color-scheme: light) {
+    :root {
+        --text: #1d1d1f;
+        --text-dim: #6e6e73;
+        --text-faint: #9a9ae;
+
+        --panel: rgba(255, 255, 255, 0.55);
+        --panel-inset: rgba(0, 0, 0, 0.04);
+        --panel-hover: rgba(0, 0, 0, 0.05);
+
+        --field-bg: #ffffff;
+        --hairline: rgba(0, 0, 0, 0.09);
+        --hairline-strong: rgba(0, 0, 0, 0.16);
+        --folder-bar-bg: rgba(0, 0, 0, 0.03);
+
+        --accent: #007aff;
+        --accent-hover: #2f96ff;
+        --accent-pressed: #0057d8;
+        --accent-tint: rgba(0, 122, 255, 0.12);
+        --danger: #d70015;
+        --danger-bg: rgba(215, 0, 21, 0.08);
+        --ok: #1a7f37;
+        --switch-off: rgba(0, 0, 0, 0.1);
+        --scrollbar-thumb: rgba(0, 0, 0, 0.2);
+        --scrollbar-thumb-hover: rgba(0, 0, 0, 0.35);
+        --tab-active: #ffffff;
+        --tab-border: rgba(0, 0, 0, 0.1);
+        --titlebar-bg: rgba(0, 0, 0, 0.05);
+        --titlebar-fg: #1d1d1f;
+
+        --modal-bg: #ffffff;
+
+        --focus-ring: rgba(0, 122, 255, 0.35);
+    }
+}
+
+* { box-sizing: border-box; }
+
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 100px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+    background-clip: padding-box;
+}
+::-webkit-scrollbar-corner { background: transparent; }
+
+html, body {
+    margin: 0;
+    height: 100%;
+    background: transparent;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+body {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-user-drag: none;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Svelte mounts into #app; without this it's a content-height block and severs
+   body's flex column, which both pins the empty-state button to the top and
+   stops .content's overflow-y from engaging. Mirror body's flex column here. */
+#app {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+input, textarea, select,
+.summary-text, .error-text {
+    user-select: text;
+    -webkit-user-select: text;
+}
+
+/* Whole window accepts folder drops. */
+body {
+    --wails-drop-target: drop;
+}
+body.wails-drop-target-active {
+    background: var(--accent-tint);
+    box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+/* Flex/grid containers must still hide when [hidden]. */
+[hidden] { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
