@@ -8,7 +8,7 @@
         <key>CFBundleExecutable</key>
         <string>{{.OutputFilename}}</string>
         <key>CFBundleIdentifier</key>
-        <string>com.wails.{{.Name}}</string>
+        <string>com.colinstark.musicpreflight</string>
         <key>CFBundleVersion</key>
         <string>{{.Info.ProductVersion}}</string>
         <key>CFBundleGetInfoString</key>
@@ -40,6 +40,23 @@
             <string>{{.IconName}}</string>
           </dict>
           {{end}}
+        </array>
+        {{end}}
+        {{if not .Info.FileAssociations}}
+        <key>CFBundleDocumentTypes</key>
+        <array>
+          <dict>
+            <key>CFBundleTypeName</key>
+            <string>Folder</string>
+            <key>LSItemContentTypes</key>
+            <array>
+              <string>public.folder</string>
+            </array>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+          </dict>
         </array>
         {{end}}
         {{if .Info.Protocols}}

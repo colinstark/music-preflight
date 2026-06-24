@@ -30,13 +30,20 @@
     --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
     --tab-active: rgba(255, 255, 255, 0.12);
     --tab-border: rgba(255, 255, 255, 0.14);
-    --titlebar-bg: #2b2b2d;
+    /* Translucent so the window vibrancy shows through; a touch more black than
+       the folder bar (--folder-bar-bg) to set the header apart. */
+    --titlebar-bg: rgba(0, 0, 0, 0.22);
     --titlebar-fg: #ffffff;
 
     --focus-ring: rgba(10, 132, 255, 0.42);
 
     --radius: 10px;
     --radius-field: 6px;
+
+    /* Solid fill for the edit modal — the rest of the window is translucent to
+       let the macOS vibrancy through, but a sheet must be opaque to be legible
+       over album art. */
+    --modal-bg: #2b2b2d;
 
     --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
     --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -69,8 +76,10 @@
     --scrollbar-thumb-hover: rgba(0, 0, 0, 0.35);
         --tab-active: #ffffff;
         --tab-border: rgba(0, 0, 0, 0.1);
-        --titlebar-bg: #d8d8db;
+        --titlebar-bg: rgba(0, 0, 0, 0.05);
         --titlebar-fg: #1d1d1f;
+
+        --modal-bg: #ffffff;
 
         --focus-ring: rgba(0, 122, 255, 0.35);
     }
@@ -128,21 +137,80 @@ input, textarea, select,
     -webkit-user-select: text;
 }
 
+/* Whole window accepts folder drops. Wails uses the --wails-drop-target custom
+   property (which inherits) to mark valid drop targets; setting it on body makes
+   every descendant a target. Wails toggles .wails-drop-target-active on body
+   while a file is dragged over the window, so the highlight is purely CSS. */
+body {
+    --wails-drop-target: drop;
+}
+body.wails-drop-target-active {
+    background: var(--accent-tint);
+    box-shadow: inset 0 0 0 2px var(--accent);
+}
+
 .app {
-    padding: 16px 0 0;
+    padding: 0;
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 14px;
 }
 
-/* Folder bar stays pinned; the content below scrolls as one wrapper. Horizontal
-   inset lives on the sections so the scrollbar can sit flush to the edge. */
+/* Empty state: until a folder is picked the whole window is just a centred
+   Choose Folder button (the folder bar and content are hidden via [hidden]). */
+.empty-state {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-large {
+    padding: 10px 28px;
+    font-size: 14px;
+}
+
+/* Folder bar: pinned, slight background, with a folder icon. */
 .folder-row {
     flex: none;
-    padding: 0 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 18px;
+    background: var(--folder-bar-bg);
+    border-bottom: 0.5px solid var(--hairline);
 }
+.folder-icon {
+    width: 15px;
+    height: 15px;
+    flex: none;
+    color: var(--text-dim);
+}
+
+/* Folder name + counts sit between the button and the right edge. The name is
+   the primary label (full colour, ellipsizes when long); the full path is kept
+   as a hover tooltip. Counts pack tight after the name and never wrap. */
+.path {
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 500;
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.folder-counts {
+    flex: none;
+    white-space: nowrap;
+    color: var(--text-faint);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+.folder-counts:empty { display: none; }
 
 .content {
     flex: 1 1 auto;
@@ -181,17 +249,18 @@ input, textarea, select,
         grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
         grid-template-areas: "sidebar library";
         align-items: start;
+        column-gap: 0;
     }
     .sidebar {
         grid-area: sidebar;
         align-self: start;
         position: sticky;
         top: 0;
-        padding: 0 0 0 18px;
+        padding: 16px 0 16px 18px;
     }
     #libraryBlock {
         grid-area: library;
-        padding: 0 18px 0 0;
+        padding: 16px 18px 16px 0;
     }
 }
 
@@ -212,23 +281,6 @@ input, textarea, select,
     --wails-draggable: none;
 }
 
-/* ---------- Toolbar / folder row ---------- */
-
-.folder-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.path {
-    color: var(--text-dim);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex: 1;
-    font-size: 12px;
-}
-
 /* ---------- Grouped panels (System Settings style) ---------- */
 
 .panel {
@@ -246,11 +298,11 @@ input, textarea, select,
     display: flex;
     flex-direction: column;
     gap: 14px;
-    padding: 0 18px;
+    padding: 16px 18px;
 }
 
 #libraryBlock {
-    padding: 0 18px;
+    padding: 16px 18px;
 }
 
 .groups {
@@ -508,5 +560,136 @@ button[hidden] { display: none; }
 }
 
 .error-text:empty { display: none; }
+
+/* ---------- Edit-album modal ---------- */
+
+/* Native <dialog>: a centred sheet over a dimmed backdrop. Sized by content,
+   capped to the viewport, with the track list scrolling independently. */
+.edit-modal {
+    margin: auto;
+    padding: 0;
+    border: 0.5px solid var(--hairline-strong);
+    border-radius: var(--radius);
+    background: var(--modal-bg);
+    backdrop-filter: saturate(1.2);
+    color: var(--text);
+    width: min(560px, calc(100vw - 40px));
+    max-height: calc(100vh - 60px);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+}
+.edit-modal::backdrop {
+    background: rgba(0, 0, 0, 0.45);
+}
+.edit-form {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    max-height: calc(100vh - 60px);
+}
+.edit-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 14px 16px 4px;
+}
+.edit-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+.edit-hint {
+    margin: 0 16px 10px;
+    color: var(--text-faint);
+    font-size: 11px;
+}
+.edit-form fieldset {
+    border: 0.5px solid var(--hairline);
+    border-radius: var(--radius-field);
+    margin: 0 16px 12px;
+    padding: 8px 12px 10px;
+}
+.edit-form legend {
+    font-size: 11px;
+    color: var(--text-dim);
+    padding: 0 4px;
+}
+.edit-album {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 12px;
+    flex: 0 0 auto;
+}
+.edit-album .field { width: auto; }
+.edit-album .field input { width: 100%; }
+
+/* The tracks fieldset is the flex region: it grows to fill the dialog and the
+   list scrolls inside it, so the modal's height is decided on first paint
+   rather than reflowing on the first interaction. */
+.edit-tracks {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.edit-track-head,
+.edit-track {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 8px;
+    align-items: center;
+}
+.edit-track-head {
+    margin: 4px 0 2px;
+    font-size: 10.5px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    flex: 0 0 auto;
+}
+.edit-track-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 2px;
+}
+.edit-track input {
+    background: var(--field-bg);
+    color: var(--text);
+    border: 0.5px solid var(--hairline-strong);
+    border-radius: var(--radius-field);
+    padding: 3px 6px;
+    font-size: 12.5px;
+    width: 100%;
+    min-width: 0;
+}
+.edit-track input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+}
+.edit-track input.et-num {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.edit-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: flex-end;
+    padding: 4px 16px 14px;
+    flex: 0 0 auto;
+}
+.edit-status {
+    flex: 1 1 auto;
+    color: var(--text-faint);
+    font-size: 11px;
+}
+.edit-status.ok { color: var(--ok); }
 
 /* ---------- Thin macOS overlay scrollbars ---------- */

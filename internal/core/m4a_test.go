@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	mp4tag "github.com/Sorrow446/go-mp4tag"
 )
 
 // m4aFixtureB64 is a tiny but valid M4A (1s silence + a 600x600 JPEG cover)
@@ -139,5 +141,98 @@ func TestSetM4AGenreHeadless(t *testing.T) {
 	}
 	if changed {
 		t.Error("expected no change when genre already set")
+	}
+}
+
+// readM4ATagsHeadless reads a file's writable text tags for test verification.
+func readM4ATagsHeadless(t *testing.T, path string) textTags {
+	t.Helper()
+	mp4, err := mp4tag.Open(path)
+	if err != nil {
+		t.Fatalf("open mp4: %v", err)
+	}
+	defer mp4.Close()
+	cur, err := mp4.Read()
+	if err != nil {
+		t.Fatalf("read mp4 tags: %v", err)
+	}
+	return readM4ATextTags(cur)
+}
+
+func TestSetM4ATagsHeadless(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "track.m4a")
+	writeM4AFixture(t, path)
+
+	want := textTags{
+		Title:       "Svefn-g-englar",
+		Artist:      "Sigur Rós",
+		AlbumArtist: "Sigur Rós",
+		Album:       "Ágætis byrjun",
+		Genre:       "Post-Rock",
+		Year:        "1999",
+		TrackNumber: 1,
+	}
+	o := DefaultOptions()
+	changed, err := setM4ATags(o, path, want)
+	if err != nil {
+		t.Fatalf("setM4ATags: %v", err)
+	}
+	if !changed {
+		t.Fatal("expected tags to be written")
+	}
+	if got := readM4ATagsHeadless(t, path); got != want {
+		t.Errorf("tags = %+v, want %+v", got, want)
+	}
+
+	// The cover must survive the text-tag rewrite.
+	if art, err := readM4AArt(path); err != nil || art == nil {
+		t.Errorf("cover lost after tag write (art=%v, err=%v)", art != nil, err)
+	}
+
+	// A second pass with the same values is a no-op.
+	changed, err = setM4ATags(o, path, want)
+	if err != nil {
+		t.Fatalf("setM4ATags second pass: %v", err)
+	}
+	if changed {
+		t.Error("expected no change when tags already match")
+	}
+}
+
+func TestSetM4ATagsClearsHeadless(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "track.m4a")
+	writeM4AFixture(t, path)
+
+	o := DefaultOptions()
+	if _, err := setM4ATags(o, path, textTags{Title: "X", Artist: "Y", Album: "Z", Year: "2020", TrackNumber: 2}); err != nil {
+		t.Fatal(err)
+	}
+	clear := textTags{}
+	if _, err := setM4ATags(o, path, clear); err != nil {
+		t.Fatal(err)
+	}
+	if got := readM4ATagsHeadless(t, path); got != clear {
+		t.Errorf("after clear, tags = %+v, want all zero", got)
+	}
+}
+
+func TestSetM4ATagsDryRunHeadless(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "track.m4a")
+	writeM4AFixture(t, path)
+
+	o := DefaultOptions()
+	o.DryRun = true
+	changed, err := setM4ATags(o, path, textTags{Title: "Dry", TrackNumber: 3})
+	if err != nil {
+		t.Fatalf("setM4ATags: %v", err)
+	}
+	if !changed {
+		t.Fatal("dry-run should report intended change")
+	}
+	if got := readM4ATagsHeadless(t, path); got.Title == "Dry" {
+		t.Error("dry-run must not write tags")
 	}
 }

@@ -15,20 +15,23 @@ import (
 // JS) preserves the fallback/clamping rules of the original UI verbatim and
 // gives them a Go unit-test home.
 type RunRequest struct {
-	Dir            string `json:"dir"`
-	ArtSize        int    `json:"artSize"`      // EMBEDDED artwork max dimension
-	CoverJPGSize   int    `json:"coverJpgSize"` // cover.jpg max dimension (resize/extract)
-	JPEGQuality    int    `json:"jpegQuality"`
-	Recursive      bool   `json:"recursive"`
-	RenameStrayJPG bool   `json:"renameStrayJpg"`
-	ResizeCoverJPG bool   `json:"resizeCoverJpg"`
-	ExtractCover   bool   `json:"extractCover"`
-	ResizeEmbedded bool   `json:"resizeEmbedded"`
-	Transcode      string `json:"transcode"` // "none" | "<mp3|aac>-<320|256|192>"
-	SetGenre       bool   `json:"setGenre"`
-	Genre          string `json:"genre"`
-	Backup         bool   `json:"backup"`
-	DryRun         bool   `json:"dryRun"`
+	Dir            string         `json:"dir"`
+	ArtSize        int            `json:"artSize"`      // EMBEDDED artwork max dimension
+	CoverJPGSize   int            `json:"coverJpgSize"` // cover.jpg max dimension (resize/extract)
+	JPEGQuality    int            `json:"jpegQuality"`
+	Recursive      bool           `json:"recursive"`
+	RenameStrayJPG bool           `json:"renameStrayJpg"`
+	ResizeCoverJPG bool           `json:"resizeCoverJpg"`
+	ExtractCover   bool           `json:"extractCover"`
+	ResizeEmbedded bool           `json:"resizeEmbedded"`
+	Transcode      string         `json:"transcode"` // "none" | "<mp3|aac>-<320|256|192>"
+	SetGenre       bool           `json:"setGenre"`
+	Genre          string         `json:"genre"`
+	SetAlbumArtist bool           `json:"setAlbumArtist"`
+	AlbumArtist    string         `json:"albumArtist"`
+	TagEdits       []core.TagEdit `json:"tagEdits"` // staged per-album/per-track edits, applied on Run
+	Backup         bool           `json:"backup"`
+	DryRun         bool           `json:"dryRun"`
 }
 
 // DefaultRequest returns the GUI defaults. Unlike core.DefaultOptions, the GUI
@@ -96,6 +99,9 @@ func (r RunRequest) Options() (core.Options, error) {
 		Transcode:      mode,
 		SetGenre:       r.SetGenre,
 		Genre:          r.Genre,
+		SetAlbumArtist: r.SetAlbumArtist,
+		AlbumArtist:    r.AlbumArtist,
+		TagEdits:       r.TagEdits,
 		Backup:         r.Backup,
 		DryRun:         r.DryRun,
 	}, nil

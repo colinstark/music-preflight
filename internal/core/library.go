@@ -25,12 +25,17 @@ type Album struct {
 	Tracks  []Track `json:"tracks"`
 }
 
-// Track is one audio file's display metadata for the preview.
+// Track is one audio file's display metadata for the preview. Path carries the
+// file's absolute path so a front-end can route per-track edits back to it;
+// Artist is the track-level artist (TPE1/©ART), which may differ from the
+// album artist on collaborations.
 type Track struct {
 	Number   int     `json:"number"`
 	Title    string  `json:"title"`
+	Artist   string  `json:"artist"`
 	Duration float64 `json:"duration"` // seconds
 	Disc     int     `json:"disc"`     // 0 when unset
+	Path     string  `json:"path"`
 }
 
 // thumbSize is the largest dimension of a preview artwork thumbnail, in pixels.
@@ -126,8 +131,10 @@ func ReadLibrary(dir string, recursive bool) ([]Album, error) {
 		g.album.Tracks = append(g.album.Tracks, Track{
 			Number:   parseLeadInt(tag(tags, "track")),
 			Title:    trackTitle,
+			Artist:   tag(tags, "artist"),
 			Duration: r.Duration,
 			Disc:     parseLeadInt(tag(tags, "disc", "part_of_a_set", "tpos")),
+			Path:     p,
 		})
 	}
 

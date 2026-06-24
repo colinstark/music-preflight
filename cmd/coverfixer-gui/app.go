@@ -6,6 +6,9 @@ package main
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"sync"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
@@ -19,6 +22,13 @@ import (
 type App struct {
 	ctx context.Context
 	c   *ui.Controller
+
+	// dirMu guards pendingDir. A folder dropped on the app/Dock icon can arrive
+	// (via Mac.OnFileOpen) before the frontend has connected — e.g. when the app
+	// is launched by the drop. It is stashed here and pulled once via
+	// InitialFolder() during frontend init.
+	dirMu      sync.Mutex
+	pendingDir string
 }
 
 // NewApp returns an App with no controller yet; the controller is created in
@@ -33,6 +43,16 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.c = ui.NewController(&wailsEmitter{ctx: ctx})
+	// Deliver folder drops into the running window. On macOS these are distinct
+	// from Dock-icon drops (which come through handleOpenFile / Mac.OnFileOpen).
+	runtime.OnFileDrop(ctx, func(_, _ int, paths []string) {
+		if len(paths) == 0 {
+			return
+		}
+		if dir := resolveFolder(paths[0]); dir != "" {
+			a.applyFolder(dir)
+		}
+	})
 }
 
 // DefaultRequest returns the GUI defaults so the frontend can seed its form
@@ -69,6 +89,58 @@ func (a *App) OpenFolder() string {
 	if err != nil {
 		return ""
 	}
+	return dir
+}
+
+// resolveFolder maps a dropped path to a music folder. A directory is used as
+// delivered; a file (e.g. an .mp3) resolves to its containing folder, which is
+// the natural unit for coverfixer. An empty/unsatisfiable path returns "".
+func resolveFolder(p string) string {
+	if p == "" {
+		return ""
+	}
+	info, err := os.Stat(p)
+	if err != nil {
+		return ""
+	}
+	if info.IsDir() {
+		return p
+	}
+	return filepath.Dir(p)
+}
+
+// applyFolder selects a folder the same way the picker does, and notifies the
+// frontend. If the frontend is connected (a.ctx set) it streams the path on the
+// cf:folder event; otherwise (launch-by-drop, before startup) the path is
+// stashed for InitialFolder to pull once init() runs.
+func (a *App) applyFolder(dir string) {
+	if dir == "" {
+		return
+	}
+	a.dirMu.Lock()
+	a.pendingDir = dir
+	a.dirMu.Unlock()
+	if a.ctx != nil {
+		runtime.EventsEmit(a.ctx, "cf:folder", dir)
+	}
+}
+
+// handleOpenFile is the Mac.OnFileOpen callback: a folder/file was dropped on
+// the app/Dock icon, launching it or while running.
+func (a *App) handleOpenFile(p string) {
+	if dir := resolveFolder(p); dir != "" {
+		a.applyFolder(dir)
+	}
+}
+
+// InitialFolder returns a folder provided at launch (e.g. by dropping a folder
+// on the Dock icon before the app was running) and clears it. The frontend
+// calls this once during init to seed the selected folder; empty means none.
+func (a *App) InitialFolder() string {
+	a.dirMu.Lock()
+	defer a.dirMu.Unlock()
+	dir := a.pendingDir
+	a.pendingDir = ""
 	return dir
 }
 

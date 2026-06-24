@@ -41,9 +41,9 @@
             .map(([disc, tr]) => ({ disc, tracks: tr }));
     }
 
-    // <album-track n title duration>
+    // <album-track n title artist duration>
     class AlbumTrack extends HTMLElement {
-        static observedAttributes = ["n", "name", "duration"];
+        static observedAttributes = ["n", "name", "artist", "duration"];
 
         constructor() {
             super();
@@ -77,6 +77,11 @@
                         white-space: nowrap;
                         font-size: 12.5px;
                     }
+                    .at-artist {
+                        color: var(--text-faint);
+                        font-size: 12.5px;
+                    }
+                    .at-artist:empty { display: none; }
                     .at-dur {
                         color: var(--text-faint);
                         font-variant-numeric: tabular-nums;
@@ -95,14 +100,24 @@
         _render() {
             const n = this.getAttribute("n");
             this._nEl.textContent = n ? n + "." : "";
-            this._titleEl.textContent = this.getAttribute("name") || "";
+            const artist = this.getAttribute("artist") || "";
+            // Title and (optional) per-track artist share the title cell as
+            // "Title — Artist"; the artist span is hidden when empty.
+            this._titleEl.innerHTML = "";
+            this._titleEl.appendChild(document.createTextNode(this.getAttribute("name") || ""));
+            if (artist) {
+                const sep = document.createElement("span");
+                sep.className = "at-artist";
+                sep.textContent = " — " + artist;
+                this._titleEl.appendChild(sep);
+            }
             this._durEl.textContent = formatDuration(parseFloat(this.getAttribute("duration") || "0"));
         }
     }
 
-    // <album-header title artist genre year artwork>
+    // <album-header title artist genre year artwork staged>
     class AlbumHeader extends HTMLElement {
-        static observedAttributes = ["heading", "artist", "genre", "year", "artwork"];
+        static observedAttributes = ["heading", "artist", "genre", "year", "artwork", "staged"];
 
         constructor() {
             super();
@@ -112,15 +127,18 @@
                     <div class="ah-art">
                         <img alt="" />
                         <div class="ah-art-ph"></div>
+                        <span class="ah-badge" title="Has unsaved edits"></span>
                     </div>
                     <div class="ah-meta">
                         <div class="ah-title"></div>
                         <div class="ah-artist"></div>
                         <div class="ah-genre"></div>
                     </div>
+                    <button class="ah-edit" type="button" title="Edit metadata">Edit</button>
                 </div>
                 <style>
                     .ah {
+                        position: relative;
                         display: flex;
                         align-items: center;
                         gap: 12px;
@@ -143,6 +161,19 @@
                         display: block;
                     }
                     .ah-art img:not([src]) { display: none; }
+                    .ah-badge {
+                        position: absolute;
+                        top: 3px;
+                        right: 3px;
+                        width: 8px;
+                        height: 8px;
+                        border-radius: 50%;
+                        background: var(--accent);
+                        border: 1.5px solid var(--panel);
+                        box-shadow: 0 0 0 1px var(--hairline);
+                        display: none;
+                    }
+                    :host([staged]) .ah-badge { display: block; }
                     .ah-title {
                         color: var(--text);
                         font-size: 13px;
@@ -165,12 +196,42 @@
                         margin-top: 1px;
                     }
                     .ah-genre:empty { display: none; }
+                    .ah-edit {
+                        position: absolute;
+                        top: -3px;
+                        right: -3px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        height: 20px;
+                        padding: 0 8px;
+                        border: 0.5px solid var(--hairline);
+                        border-radius: 5px;
+                        background: var(--panel);
+                        color: var(--text-dim);
+                        font-size: 11px;
+                        font-weight: 500;
+                        cursor: pointer;
+                        opacity: 0;
+                        transition: opacity 0.12s ease;
+                    }
+                    .ah:hover .ah-edit,
+                    .ah-edit:focus-visible { opacity: 1; }
+                    .ah-edit:hover { color: var(--text); border-color: var(--accent); }
                 </style>
             `;
             this._img = root.querySelector("img");
             this._titleEl = root.querySelector(".ah-title");
             this._artistEl = root.querySelector(".ah-artist");
             this._genreEl = root.querySelector(".ah-genre");
+            // The edit button crosses two shadow boundaries (album-header's and
+            // preview-album's); composed+bubbles lets app.js hear it retargeted
+            // to the <preview-album> host, whose data-idx names the album.
+            root.querySelector(".ah-edit").addEventListener("click", (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.dispatchEvent(new CustomEvent("album-edit", { bubbles: true, composed: true }));
+            });
         }
 
         attributeChangedCallback() { this._render(); }
@@ -236,6 +297,8 @@
             this._header.setAttribute("year", album.year || "");
             if (album.artwork) this._header.setAttribute("artwork", album.artwork);
             else this._header.removeAttribute("artwork");
+            if (album.staged) this._header.setAttribute("staged", "");
+            else this._header.removeAttribute("staged");
 
             // Split tracks into disc groups; only render "Disc N" headings when
             // the album spans more than one disc. Tracks arrive sorted by the
@@ -256,6 +319,7 @@
                     const tr = document.createElement("album-track");
                     if (t.number) tr.setAttribute("n", String(t.number));
                     tr.setAttribute("name", t.title || "");
+                    if (t.artist) tr.setAttribute("artist", t.artist);
                     tr.setAttribute("duration", String(t.duration || 0));
                     ol.appendChild(tr);
                 }

@@ -48,6 +48,33 @@ func setGenre(o Options, path string, rep *reportAccum, progress func(Event)) {
 	}
 }
 
+// setAlbumArtist writes o.AlbumArtist into an audio file's ALBUM-ARTIST tag in
+// place (format-dispatched), recording the outcome on rep. Only the album-artist
+// frame is written; per-track artist tags are never touched. Unsupported formats
+// are a no-op.
+func setAlbumArtist(o Options, path string, rep *reportAccum, progress func(Event)) {
+	var (
+		changed bool
+		err     error
+	)
+	switch classifyAudio(path) {
+	case audioMP3:
+		changed, err = setMP3AlbumArtist(o, path)
+	case audioM4A:
+		changed, err = setM4AAlbumArtist(o, path)
+	default:
+		return
+	}
+	if err != nil {
+		rep.fail(progress, "set-album-artist", path, err)
+		return
+	}
+	if changed {
+		rep.action(progress, "set-album-artist", path, o.AlbumArtist)
+		rep.inc(&rep.AlbumArtistsSet)
+	}
+}
+
 // ReadFirstGenre returns the genre tag of the first audio file found under dir
 // (the first file classifyAudio recognises, even if its genre is empty), or ""
 // if there is no audio. It is used to prefill the GUI's genre field. It never

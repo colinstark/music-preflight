@@ -23,11 +23,14 @@ func main() {
 		MinHeight:     240,
 		DisableResize: false,
 		AssetServer:   &assetserver.Options{Assets: assets},
+		// Accept folder drops into the running window. runtime.OnFileDrop
+		// (registered in startup) delivers the absolute paths.
+		DragAndDrop: &options.DragAndDrop{EnableFileDrop: true},
 		// Transparent so macOS never paints a solid (white) window background
 		// behind the native titlebar — otherwise scrolling flips the titlebar
 		// to that colour. The vibrancy material shows through instead.
 		BackgroundColour: &options.RGBA{R: 0, G: 0, B: 0, A: 0},
-		OnStartup: app.startup,
+		OnStartup:        app.startup,
 		Bind: []interface{}{
 			app,
 		},
@@ -39,6 +42,10 @@ func main() {
 			WebviewIsTransparent: true,
 			WindowIsTranslucent:  true,
 			Appearance:           mac.DefaultAppearance,
+			// Fired when a folder is dropped on the app/Dock icon — whether the
+			// app is already running or being launched by the drop. Routes the
+			// path to the selected-folder field via app.handleOpenFile.
+			OnFileOpen: app.handleOpenFile,
 			About: &mac.AboutInfo{
 				Title:   "Music Preflight",
 				Message: "Batch-fix cover art in a music library.",

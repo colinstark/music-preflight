@@ -88,8 +88,42 @@ type Options struct {
 	SetGenre bool   // set the genre tag on audio files to Genre
 	Genre    string // genre string written when SetGenre is true
 
+	// SetAlbumArtist writes AlbumArtist to the ALBUM-ARTIST tag (TPE2 / aART) of
+	// every audio file. It deliberately targets only the album-artist frame, so
+	// per-track ARTIST tags (TPE1 / ©ART) are left untouched.
+	SetAlbumArtist bool
+	AlbumArtist    string
+
+	// TagEdits are front-end-staged per-album metadata edits applied during the
+	// run, after the genre pass (so a per-album edit overrides the global genre
+	// for its files) and before transcode (so tags carry into any output). Empty
+	// for normal runs.
+	TagEdits []TagEdit
+
 	Backup bool // duplicate the selected folder into a sibling "backup" dir before mutating
 	DryRun bool // report intended actions without changing anything
+}
+
+// TagEdit is one album's worth of staged metadata edits, supplied by a
+// front-end and applied during a Run. The album-level fields (Album,
+// AlbumArtist, Genre, Year) are written to every file listed in Tracks; each
+// TrackTagEdit supplies the per-file title, artist and track number. Fields are
+// written as-is — empty clears the tag — so a front-end should pre-fill its edit
+// UI with current values and send back the full intended set.
+type TagEdit struct {
+	Album       string         `json:"album"`
+	AlbumArtist string         `json:"albumArtist"`
+	Genre       string         `json:"genre"`
+	Year        string         `json:"year"`
+	Tracks      []TrackTagEdit `json:"tracks"`
+}
+
+// TrackTagEdit is the per-file portion of a TagEdit.
+type TrackTagEdit struct {
+	Path        string `json:"path"`
+	Title       string `json:"title"`
+	Artist      string `json:"artist"`
+	TrackNumber int    `json:"trackNumber"`
 }
 
 // DefaultOptions returns the recommended defaults: 500×500 baseline JPEG q85,

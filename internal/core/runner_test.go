@@ -272,6 +272,48 @@ func TestRunSetsGenre(t *testing.T) {
 	}
 }
 
+// TestRunSetsAlbumArtist writes the album-artist tag (TPE2) via the global
+// metadata pass and confirms the per-track ARTIST (TPE1) is preserved — the
+// album-artist field must not clobber track-level artist data.
+func TestRunSetsAlbumArtist(t *testing.T) {
+	root := t.TempDir()
+	album := filepath.Join(root, "Album")
+	if err := os.MkdirAll(album, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(album, "01.mp3")
+	writeMP3WithArt(t, path, makeJPEG(t, 200, 200))
+
+	// Give the file a track artist (TPE1) and an existing album artist (TPE2).
+	o := DefaultOptions()
+	if _, err := setMP3Tags(o, path, textTags{Title: "Song", Artist: "Lead Singer", AlbumArtist: "Old AA"}); err != nil {
+		t.Fatal(err)
+	}
+
+	o.Dir = root
+	o.RenameStrayJPG = false
+	o.ResizeCoverJPG = false
+	o.ExtractCover = false
+	o.SetAlbumArtist = true
+	o.AlbumArtist = "New AA"
+
+	rep, err := Run(context.Background(), o, nil)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if rep.AlbumArtistsSet != 1 {
+		t.Errorf("AlbumArtistsSet = %d, want 1", rep.AlbumArtistsSet)
+	}
+
+	got := readMP3Tags(t, path)
+	if got.AlbumArtist != "New AA" {
+		t.Errorf("album artist = %q, want New AA", got.AlbumArtist)
+	}
+	if got.Artist != "Lead Singer" {
+		t.Errorf("track artist = %q, want \"Lead Singer\" (must be preserved)", got.Artist)
+	}
+}
+
 // TestReadFirstGenre returns the first audio file's genre, used to prefill the
 // GUI field. An album whose first track carries a genre is prefilled with it.
 func TestReadFirstGenre(t *testing.T) {
@@ -336,5 +378,136 @@ func TestRunParallelEmbeddedResize(t *testing.T) {
 		if w, h := jpegDimensions(t, art); w > 500 || h > 500 {
 			t.Errorf("track %02d art %dx%d, want <= 500", i+1, w, h)
 		}
+	}
+}
+
+// TestRunAppliesTagEdits drives the tag-edit pass through Run and confirms the
+// album-level fields land on every track while per-track fields land per file.
+func TestRunAppliesTagEdits(t *testing.T) {
+	root := t.TempDir()
+	album := filepath.Join(root, "Album")
+	if err := os.MkdirAll(album, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t1 := filepath.Join(album, "01.mp3")
+	t2 := filepath.Join(album, "02.mp3")
+	writeMP3WithArt(t, t1, makeJPEG(t, 200, 200))
+	writeMP3WithArt(t, t2, makeJPEG(t, 200, 200))
+
+	o := DefaultOptions()
+	o.Dir = root
+	o.RenameStrayJPG = false
+	o.ResizeCoverJPG = false
+	o.ExtractCover = false
+	o.TagEdits = []TagEdit{{
+		Album:       "Nylon",
+		AlbumArtist: "Nylon Trio",
+		Genre:       "Jazz",
+		Year:        "2021",
+		Tracks: []TrackTagEdit{
+			{Path: t1, Title: "First", Artist: "Nylon Trio", TrackNumber: 1},
+			{Path: t2, Title: "Second", Artist: "Nylon Trio", TrackNumber: 2},
+		},
+	}}
+
+	rep, err := Run(context.Background(), o, nil)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if rep.TagsEdited != 2 {
+		t.Errorf("TagsEdited = %d, want 2", rep.TagsEdited)
+	}
+	for _, c := range []struct {
+		path         string
+		title        string
+		trackNumber  int
+		album, genre string
+	}{
+		{t1, "First", 1, "Nylon", "Jazz"},
+		{t2, "Second", 2, "Nylon", "Jazz"},
+	} {
+		got := readMP3Tags(t, c.path)
+		if got.Title != c.title || got.TrackNumber != c.trackNumber {
+			t.Errorf("%s: title/num = %q/%d, want %q/%d", c.path, got.Title, got.TrackNumber, c.title, c.trackNumber)
+		}
+		if got.Album != c.album || got.AlbumArtist != "Nylon Trio" || got.Genre != c.genre || got.Year != "2021" {
+			t.Errorf("%s: album fields = %+v", c.path, got)
+		}
+	}
+}
+
+// TestRunTagEditsOverrideGenre confirms the tag-edit pass runs after the genre
+// pass, so a per-album genre wins over the global SetGenre for its files.
+func TestRunTagEditsOverrideGenre(t *testing.T) {
+	root := t.TempDir()
+	album := filepath.Join(root, "Album")
+	if err := os.MkdirAll(album, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(album, "01.mp3")
+	writeMP3WithArt(t, path, makeJPEG(t, 200, 200))
+
+	o := DefaultOptions()
+	o.Dir = root
+	o.RenameStrayJPG = false
+	o.ResizeCoverJPG = false
+	o.ExtractCover = false
+	o.SetGenre = true
+	o.Genre = "Global"
+	o.TagEdits = []TagEdit{{
+		Genre: "Per-Album",
+		Tracks: []TrackTagEdit{
+			{Path: path, Title: "T", TrackNumber: 1},
+		},
+	}}
+
+	rep, err := Run(context.Background(), o, nil)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if rep.GenresSet != 1 {
+		t.Errorf("GenresSet = %d, want 1", rep.GenresSet)
+	}
+	if rep.TagsEdited != 1 {
+		t.Errorf("TagsEdited = %d, want 1", rep.TagsEdited)
+	}
+	if g, _ := readMP3Genre(path); g != "Per-Album" {
+		t.Errorf("genre = %q, want Per-Album (tag-edit pass should win)", g)
+	}
+}
+
+// TestRunTagEditsDryRun confirms staged tag edits are reported but not written
+// under DryRun.
+func TestRunTagEditsDryRun(t *testing.T) {
+	root := t.TempDir()
+	album := filepath.Join(root, "Album")
+	if err := os.MkdirAll(album, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(album, "01.mp3")
+	writeMP3WithArt(t, path, makeJPEG(t, 200, 200))
+
+	o := DefaultOptions()
+	o.Dir = root
+	o.RenameStrayJPG = false
+	o.ResizeCoverJPG = false
+	o.ExtractCover = false
+	o.DryRun = true
+	o.TagEdits = []TagEdit{{
+		Album: "Should Not Persist",
+		Tracks: []TrackTagEdit{
+			{Path: path, Title: "Nope", TrackNumber: 9},
+		},
+	}}
+
+	rep, err := Run(context.Background(), o, nil)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if rep.TagsEdited != 1 {
+		t.Errorf("TagsEdited = %d, want 1 (intended)", rep.TagsEdited)
+	}
+	if got := readMP3Tags(t, path); got.Album == "Should Not Persist" || got.Title == "Nope" {
+		t.Errorf("dry-run wrote tags: %+v", got)
 	}
 }

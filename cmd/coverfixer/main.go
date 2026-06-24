@@ -26,6 +26,7 @@ func main() {
 	flag.BoolVar(&o.ResizeEmbedded, "resize-embedded", o.ResizeEmbedded, "resize artwork embedded inside audio files, in place")
 	transcode := flag.String("transcode", "none", "audio conversion: none|<mp3|aac>-<320|256|192>")
 	genre := flag.String("genre", "", "set the genre tag on every audio file to this value (empty = off)")
+	albumArtist := flag.String("album-artist", "", "set the album-artist tag (TPE2/aART) on every audio file to this value; per-track artist tags are not touched (empty = off)")
 	flag.BoolVar(&o.Backup, "backup", o.Backup, "duplicate the selected folder into a sibling \"backup\" dir before running")
 	flag.BoolVar(&o.DryRun, "dry-run", o.DryRun, "report intended actions without changing anything")
 	noRecursive := flag.Bool("no-recursive", false, "do not descend into subfolders")
@@ -50,6 +51,10 @@ func main() {
 	if *genre != "" {
 		o.SetGenre = true
 		o.Genre = *genre
+	}
+	if *albumArtist != "" {
+		o.SetAlbumArtist = true
+		o.AlbumArtist = *albumArtist
 	}
 
 	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
@@ -116,6 +121,12 @@ func printSummary(r core.Report, dryRun bool) {
 	fmt.Printf("  Embedded resized : %d\n", r.EmbeddedResized)
 	fmt.Printf("  Transcoded       : %d\n", r.Transcoded)
 	fmt.Printf("  Genres set       : %d\n", r.GenresSet)
+	if r.AlbumArtistsSet > 0 {
+		fmt.Printf("  Album artists set: %d\n", r.AlbumArtistsSet)
+	}
+	if r.TagsEdited > 0 {
+		fmt.Printf("  Tags edited      : %d\n", r.TagsEdited)
+	}
 	fmt.Printf("  Skipped          : %d\n", r.Skipped)
 	if r.Failed > 0 {
 		fmt.Printf("  Failed           : %d\n", r.Failed)

@@ -15,7 +15,7 @@ const (
 // Event is emitted through Run's progress callback for each unit of work.
 type Event struct {
 	Kind   EventKind
-	Op     string // "rename", "resize-cover", "extract", "resize-embedded", "transcode", "set-genre", "backup"
+	Op     string // "rename", "resize-cover", "extract", "resize-embedded", "transcode", "set-genre", "set-album-artist", "set-tags", "backup"
 	Path   string
 	Detail string
 	Err    error
@@ -32,6 +32,8 @@ type Report struct {
 	EmbeddedResized int
 	Transcoded      int
 	GenresSet       int
+	AlbumArtistsSet int
+	TagsEdited      int
 	Skipped         int
 	Failed          int
 }

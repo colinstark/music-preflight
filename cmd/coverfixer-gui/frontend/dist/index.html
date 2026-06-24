@@ -9,13 +9,17 @@
 <body>
 <header class="titlebar"><span class="titlebar-title">Music Preflight</span></header>
 <main class="app">
-    <section class="folder-row">
-        <svg class="folder-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12.4142 5H21C21.5523 5 22 5.44772 22 6V20C22 20.5523 21.5523 21 21 21H3C2.44772 21 2 20.5523 2 20V4C2 3.44772 2.44772 3 3 3H10.4142L12.4142 5Z"></path></svg>
+    <div id="emptyState" class="empty-state">
+        <button id="emptyFolderBtn" class="btn btn-primary btn-large" type="button">Choose Folder</button>
+    </div>
+    <section class="folder-row" hidden>
         <button id="folderBtn" class="btn" type="button">Choose Folder</button>
+        <svg id="folderIcon" class="folder-icon" viewBox="0 0 24 24" fill="currentColor" hidden><path d="M12.4142 5H21C21.5523 5 22 5.44772 22 6V20C22 20.5523 21.5523 21 21 21H3C2.44772 21 2 20.5523 2 20V4C2 3.44772 2.44772 3 3 3H10.4142L12.4142 5Z"></path></svg>
         <span id="pathLabel" class="path">No folder selected</span>
+        <span id="folderCounts" class="folder-counts"></span>
     </section>
     <input type="hidden" id="dir" />
-    <div class="content">
+    <div class="content" hidden>
     <div class="sidebar">
     <div class="groups">
     <option-group id="resizeEmbeddedGroup" label="Resize Cover Art">
@@ -45,7 +49,7 @@
         </div>
     </option-group>
 
-    <option-group id="metadataGroup" label="Metadata">
+    <option-group id="metadataGroup" label="Update Metadata for all">
         <div class="meta-fields">
             <label class="field">
                 <span>Album Artist</span>
@@ -62,7 +66,6 @@
     <section class="actions">
         <div id="progressBar" class="progress-bar" hidden aria-hidden="true"><div class="progress-bar-fill"></div></div>
         <toggle-switch id="backup" label="Create backup"></toggle-switch>
-        <button id="debugRunBtn" class="btn" type="button">Debug Run</button>
         <button id="runBtn" class="btn btn-primary" type="button" disabled>Run</button>
         <button id="cancelBtn" class="btn btn-cancel" type="button" hidden>Cancel</button>
     </section>
@@ -77,6 +80,34 @@
         <div id="preview" class="preview"></div>
     </section>
     </div>
+
+    <!-- Per-album metadata editor. Edits are staged here and applied on Run. -->
+    <dialog id="editModal" class="edit-modal">
+        <form id="editForm" class="edit-form" method="dialog">
+            <div class="edit-head">
+                <h2 class="edit-title" id="editHeading">Edit Album</h2>
+            </div>
+            <p class="edit-hint">Staged until you Run. Apply-on-Run rules apply.</p>
+            <fieldset class="edit-album">
+                <legend>Album</legend>
+                <label class="field"><span>Title</span><input type="text" id="editAlbumTitle" autocomplete="off" /></label>
+                <label class="field"><span>Album Artist</span><input type="text" id="editAlbumArtist" autocomplete="off" /></label>
+                <label class="field"><span>Genre</span><input type="text" id="editGenre" autocomplete="off" /></label>
+                <label class="field"><span>Year</span><input type="text" id="editYear" autocomplete="off" inputmode="numeric" /></label>
+            </fieldset>
+            <fieldset class="edit-tracks">
+                <legend>Tracks</legend>
+                <div class="edit-track-head"><span>#</span><span>Title</span><span>Artist</span></div>
+                <div id="editTrackList" class="edit-track-list"></div>
+            </fieldset>
+            <div class="edit-actions">
+                <button type="button" id="editRevert" class="btn">Revert</button>
+                <span id="editStatus" class="edit-status"></span>
+                <button type="button" id="editCancel" class="btn">Cancel</button>
+                <button type="submit" id="editSave" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </dialog>
 </main>
 <script src="toggle-switch.js"></script>
 <script src="option-group.js"></script>

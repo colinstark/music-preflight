@@ -1,6 +1,9 @@
 package core
 
-import "context"
+import (
+	"context"
+	"path/filepath"
+)
 
 // Run processes o.Dir according to the enabled passes and returns a Report.
 // progress, if non-nil, receives a live Event for each unit of work; the CLI
@@ -19,6 +22,11 @@ func Run(ctx context.Context, o Options, progress func(Event)) (Report, error) {
 	if err != nil {
 		return rep.Report, err
 	}
+
+	// Flatten the front-end's per-album edits into per-folder file edits once,
+	// so the tag-edit pass can be applied within the per-folder loop (after the
+	// genre pass, before transcode).
+	tagEdits := editsByFolder(o)
 
 	// Duplicate the whole selected folder before mutating anything. Done after
 	// scan (so a bad root errors out first) but before the first in-place edit.
@@ -58,18 +66,39 @@ func Run(ctx context.Context, o Options, progress func(Event)) (Report, error) {
 			}
 		}
 
-		// Pass 4: set the genre tag. Runs before transcode so the tag is
-		// carried onto the output by ffmpeg's -map_metadata 0.
-		if o.SetGenre && o.Genre != "" && len(f.audio) > 0 {
+		// Pass 4: set the global genre and/or album-artist tags. Runs before
+		// transcode so the tags are carried onto the output by ffmpeg's
+		// -map_metadata 0, and before the per-album tag-edit pass so a staged
+		// edit can still override these per album.
+		wantGenre := o.SetGenre && o.Genre != ""
+		wantAlbumArtist := o.SetAlbumArtist && o.AlbumArtist != ""
+		if (wantGenre || wantAlbumArtist) && len(f.audio) > 0 {
 			if err := forEachParallel(ctx, f.audio, func(_ context.Context, a string) error {
-				setGenre(o, a, &rep, progress)
+				if wantGenre {
+					setGenre(o, a, &rep, progress)
+				}
+				if wantAlbumArtist {
+					setAlbumArtist(o, a, &rep, progress)
+				}
 				return nil
 			}); err != nil {
 				return rep.Report, err
 			}
 		}
 
-		// Pass 5: transcode audio. Runs after the embedded-art and genre
+		// Pass 5: apply front-end-staged per-album/per-track metadata edits.
+		// Runs after the genre pass (so a per-album genre overrides the global
+		// one for its files) and before transcode (so tags carry into output).
+		if edits := tagEdits[f.dir]; len(edits) > 0 {
+			if err := forEachParallel(ctx, edits, func(_ context.Context, fe fileEdit) error {
+				setTags(o, fe.path, fe.want, &rep, progress)
+				return nil
+			}); err != nil {
+				return rep.Report, err
+			}
+		}
+
+		// Pass 6: transcode audio. Runs after the embedded-art and genre
 		// passes so the (already-resized) cover and genre carry into the new
 		// file via -map_metadata 0. Each transcode is an independent ffmpeg
 		// subprocess, so this pass benefits most from the worker pool.
@@ -97,11 +126,27 @@ func folderHasWork(o Options, f *albumFolder) bool {
 		return true
 	case o.SetGenre && o.Genre != "" && len(f.audio) > 0:
 		return true
+	case o.SetAlbumArtist && o.AlbumArtist != "" && len(f.audio) > 0:
+		return true
+	case folderHasTagEdits(o, f.dir) && len(f.audio) > 0:
+		return true
 	case o.Transcode != TranscodeNone && len(f.audio) > 0:
 		return true
 	default:
 		return false
 	}
+}
+
+// folderHasTagEdits reports whether any staged TagEdit targets a file in dir.
+func folderHasTagEdits(o Options, dir string) bool {
+	for _, ed := range o.TagEdits {
+		for _, tr := range ed.Tracks {
+			if tr.Path != "" && filepath.Dir(tr.Path) == dir {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func resizeEmbedded(o Options, path string, rep *reportAccum, progress func(Event)) {

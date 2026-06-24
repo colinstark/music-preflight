@@ -132,3 +132,110 @@ func TestSetMP3GenreDryRun(t *testing.T) {
 		t.Error("dry-run must not write the tag")
 	}
 }
+
+// openMP3ForRead opens path for reading text tags and returns its current
+// values, closing the tag behind the returned snapshot.
+func readMP3Tags(t *testing.T, path string) textTags {
+	t.Helper()
+	tag, err := id3v2.Open(path, id3v2.Options{Parse: true})
+	if err != nil {
+		t.Fatalf("open id3: %v", err)
+	}
+	defer tag.Close()
+	return readMP3TextTags(tag)
+}
+
+func TestSetMP3Tags(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "track.mp3")
+	writeMP3WithArt(t, path, makeJPEG(t, 200, 200))
+
+	want := textTags{
+		Title:       "Lullaby",
+		Artist:      "Sigur Rós",
+		AlbumArtist: "Sigur Rós",
+		Album:       "()",
+		Genre:       "Post-Rock",
+		Year:        "1999",
+		TrackNumber: 4,
+	}
+	o := DefaultOptions()
+	changed, err := setMP3Tags(o, path, want)
+	if err != nil {
+		t.Fatalf("setMP3Tags: %v", err)
+	}
+	if !changed {
+		t.Fatal("expected tags to be written")
+	}
+	if got := readMP3Tags(t, path); got != want {
+		t.Errorf("tags = %+v, want %+v", got, want)
+	}
+
+	// A second pass with the same values is a no-op.
+	changed, err = setMP3Tags(o, path, want)
+	if err != nil {
+		t.Fatalf("setMP3Tags second pass: %v", err)
+	}
+	if changed {
+		t.Error("expected no change when tags already match")
+	}
+}
+
+func TestSetMP3TagsClearsFields(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "track.mp3")
+	writeMP3WithArt(t, path, makeJPEG(t, 200, 200))
+
+	o := DefaultOptions()
+	if _, err := setMP3Tags(o, path, textTags{Title: "X", Artist: "Y", Album: "Z", Year: "2020", TrackNumber: 1}); err != nil {
+		t.Fatal(err)
+	}
+	// Clearing every field writes empty values throughout.
+	clear := textTags{}
+	if _, err := setMP3Tags(o, path, clear); err != nil {
+		t.Fatal(err)
+	}
+	if got := readMP3Tags(t, path); got != clear {
+		t.Errorf("after clear, tags = %+v, want all zero", got)
+	}
+}
+
+func TestSetMP3TagsDryRun(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "track.mp3")
+	writeMP3WithArt(t, path, makeJPEG(t, 200, 200))
+
+	o := DefaultOptions()
+	o.DryRun = true
+	want := textTags{Title: "Dry", TrackNumber: 7}
+	changed, err := setMP3Tags(o, path, want)
+	if err != nil {
+		t.Fatalf("setMP3Tags: %v", err)
+	}
+	if !changed {
+		t.Fatal("dry-run should report intended change")
+	}
+	if got := readMP3Tags(t, path); got.Title == "Dry" {
+		t.Error("dry-run must not write tags")
+	}
+}
+
+func TestFormatTRCK(t *testing.T) {
+	for _, c := range []struct {
+		n    int
+		prev string
+		want string
+	}{
+		{5, "", "5"},
+		{5, "5", "5"},
+		{5, "5/12", "5/12"},
+		{9, "3/12", "9/12"},
+		{0, "3/12", ""},
+		{-1, "3/12", ""},
+		{2, "/", "2/"},
+	} {
+		if got := formatTRCK(c.n, c.prev); got != c.want {
+			t.Errorf("formatTRCK(%d, %q) = %q, want %q", c.n, c.prev, got, c.want)
+		}
+	}
+}
