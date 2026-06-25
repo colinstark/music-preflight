@@ -1,4 +1,4 @@
-# coverfixer
+# Music Preflight
 
 `coverfixer` batch-fixes cover art in a music library. It is the Go successor to
 `rockbox_covers.sh`. In a single pass over a folder tree it can:
